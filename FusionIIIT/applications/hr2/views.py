@@ -13,6 +13,11 @@ from applications.establishment.models import *
 from applications.establishment.views import *
 from applications.eis.models import *
 from applications.globals.models import ExtraInfo, HoldsDesignation, DepartmentInfo, Designation
+from django.views.decorators.http import require_http_methods
+from rest_framework.decorators import api_view, permission_classes,authentication_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import TokenAuthentication
+
 
 from html import escape
 from io import BytesIO
@@ -2512,3 +2517,119 @@ def getformcpdaReimbursement(request):
 
 
 
+
+
+
+# React json data routes Date 28-10-2024 --------------------------------------------
+
+
+
+# leave Routes function--------------------------------------
+
+
+#leave requests
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_leave_requests(request):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+    
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        leave_requests = LeaveForm.objects.filter(employeeId=user_id)
+        username = employee.user
+        uploader_designation = 'Assistant Professor'
+        designation = get_designation_by_user_id(employee.user)
+        if designation:
+            uploader_designation = designation
+
+        leave_requests_json = []
+        for leave_request in leave_requests:
+            leave_requests_json.append({
+                'id': leave_request.id,
+                'name': leave_request.name,
+                'designation': leave_request.designation,
+                'submissionDate': leave_request.submissionDate.strftime("%Y-%m-%d") if leave_request.submissionDate else None,
+                'is_approved': leave_request.approved,
+            })
+
+        return JsonResponse({'leave_requests': leave_requests_json})
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+     
+
+
+#leave Inbox
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_leave_inbox(request):
+    # Assuming user_id is derived from request.user
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+    
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+    
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        username = employee.user
+        uploader_designation = 'Assistant Professor'
+        designation = get_designation_by_user_id(employee.user)
+        if designation:
+            uploader_designation = designation
+        
+        inbox = view_inbox(username=username, designation=uploader_designation, src_module="HR")
+        filtered_inbox = [i for i in inbox if i.get('file_extra_JSON', {}).get('type') == 'Leave']
+        
+        return JsonResponse({'leave_inbox': filtered_inbox})
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+
+
+# leave archive
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_leave_archive(request):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        username = employee.user
+        uploader_designation = 'Assistant Professor'
+        designation = get_designation_by_user_id(employee.user)
+        if designation:
+            uploader_designation = designation
+
+        archived_files = view_archived(username=username, designation=uploader_designation, src_module="HR")
+        filtered_archived_files = [i for i in archived_files if i.get('file_extra_JSON', {}).get('type') == 'Leave']
+
+        return JsonResponse({'leave_archive': filtered_archived_files})
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+    

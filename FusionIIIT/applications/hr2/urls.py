@@ -75,6 +75,12 @@ urlpatterns = [
 
 
 
+    # New routes for React api Date:28-10-2024 --------------------------------------------------------------------------------------------------
+    
+    url(r'api/get_leave_requests', views.get_leave_requests, name='get_leave_requests'),
+    url(r'api/get_leave_inbox', views.get_leave_inbox, name='get_leave_inbox'),
+    url(r'api/get_leave_archive', views.get_leave_archive, name='get_leave_archive'),
+    
 
 
 
