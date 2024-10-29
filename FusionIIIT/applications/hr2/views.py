@@ -2632,4 +2632,431 @@ def get_leave_archive(request):
         return JsonResponse({'leave_archive': filtered_archived_files})
 
     return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+
+
+# ltc Routes function--------------------------------------
+
+#ltc requests
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_ltc_requests(request):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+    
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        ltc_requests = LTCform.objects.filter(employeeId=user_id)
+        username = employee.user
+        uploader_designation = 'Assistant Professor'
+        designation = get_designation_by_user_id(employee.user)
+        if designation:
+            uploader_designation = designation
+
+        ltc_requests_json = []
+        for ltc_request in ltc_requests:
+            ltc_requests_json.append({
+                'id': ltc_request.id,
+                'name': ltc_request.name,
+                'designation': ltc_request.designation,
+                'submissionDate': ltc_request.submissionDate.strftime("%Y-%m-%d") if ltc_request.submissionDate else None,
+                'is_approved': ltc_request.approved,
+            })
+
+        return JsonResponse({'ltc_requests': ltc_requests_json})
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+# ltc Inbox
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_ltc_inbox(request):
+    # Assuming user_id is derived from request.user
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+    
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+    
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        username = employee.user
+        uploader_designation = 'Assistant Professor'
+        designation = get_designation_by_user_id(employee.user)
+        if designation:
+            uploader_designation = designation
+        
+        inbox = view_inbox(username=username, designation=uploader_designation, src_module="HR")
+        filtered_inbox = [i for i in inbox if i.get('file_extra_JSON', {}).get('type') == 'LTC']
+        
+        return JsonResponse({'ltc_inbox': filtered_inbox})
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+# ltc archive
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_ltc_archive(request):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        username = employee.user
+        uploader_designation = 'Assistant Professor'
+        designation = get_designation_by_user_id(employee.user)
+        if designation:
+            uploader_designation = designation
+
+        archived_files = view_archived(username=username, designation=uploader_designation, src_module="HR")
+        filtered_archived_files = [i for i in archived_files if i.get('file_extra_JSON', {}).get('type') == 'LTC']
+
+        return JsonResponse({'ltc_archive': filtered_archived_files})
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+
+# cpda advance Routes function--------------------------------------
+
+#cpda advance requests
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_cpda_adv_requests(request):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+    
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        cpda_adv_requests = CPDAAdvanceform.objects.filter(employeeId=user_id)
+        username = employee.user
+        uploader_designation = 'Assistant Professor'
+        designation = get_designation_by_user_id(employee.user)
+        if designation:
+            uploader_designation = designation
+
+        cpda_adv_requests_json = []
+        for cpda_adv_request in cpda_adv_requests:
+            cpda_adv_requests_json.append({
+                'id': cpda_adv_request.id,
+                'name': cpda_adv_request.name,
+                'designation': cpda_adv_request.designation,
+                'submissionDate': cpda_adv_request.submissionDate.strftime("%Y-%m-%d") if cpda_adv_request.submissionDate else None,
+                'is_approved': cpda_adv_request.approved,
+            })
+
+        return JsonResponse({'cpda_adv_requests': cpda_adv_requests_json})
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+# cpda advance Inbox
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_cpda_adv_inbox(request):
+    # Assuming user_id is derived from request.user
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+    
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+    
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        username = employee.user
+        uploader_designation = 'Assistant Professor'
+        designation = get_designation_by_user_id(employee.user)
+        if designation:
+            uploader_designation = designation
+        
+        inbox = view_inbox(username=username, designation=uploader_designation, src_module="HR")
+        filtered_inbox = [i for i in inbox if i.get('file_extra_JSON', {}).get('type') == 'CPDAAdvance']
+        
+        return JsonResponse({'cpda_adv_inbox': filtered_inbox})
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+# cpda advance archive
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_cpda_adv_archive(request):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        username = employee.user
+        uploader_designation = 'Assistant Professor'
+        designation = get_designation_by_user_id(employee.user)
+        if designation:
+            uploader_designation = designation
+
+        archived_files = view_archived(username=username, designation=uploader_designation, src_module="HR")
+        filtered_archived_files = [i for i in archived_files if i.get('file_extra_JSON', {}).get('type') == 'CPDAAdvance']
+
+        return JsonResponse({'cpda_adv_archive': filtered_archived_files})
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+
+# cpda reimbursement Routes function--------------------------------------
+
+#cpda reimbursement requests
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_cpda_claim_requests(request):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+    
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        cpda_claim_requests = CPDAReimbursementform.objects.filter(employeeId=user_id)
+        username = employee.user
+        uploader_designation = 'Assistant Professor'
+        designation = get_designation_by_user_id(employee.user)
+        if designation:
+            uploader_designation = designation
+
+        cpda_claim_requests_json = []
+        for cpda_claim_request in cpda_claim_requests:
+            cpda_claim_requests_json.append({
+                'id': cpda_claim_request.id,
+                'name': cpda_claim_request.name,
+                'designation': cpda_claim_request.designation,
+                'submissionDate': cpda_claim_request.submissionDate.strftime("%Y-%m-%d") if cpda_claim_request.submissionDate else None,
+                'is_approved': cpda_claim_request.approved,
+            })
+
+        return JsonResponse({'cpda_claim_requests': cpda_claim_requests_json})
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+# cpda reimbursement Inbox
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_cpda_claim_inbox(request):
+    # Assuming user_id is derived from request.user
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+    
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+    
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        username = employee.user
+        uploader_designation = 'Assistant Professor'
+        designation = get_designation_by_user_id(employee.user)
+        if designation:
+            uploader_designation = designation
+        
+        inbox = view_inbox(username=username, designation=uploader_designation, src_module="HR")
+        filtered_inbox = [i for i in inbox if i.get('file_extra_JSON', {}).get('type') == 'CPDAReimbursement']
+        
+        return JsonResponse({'cpda_claim_inbox': filtered_inbox})
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+# cpda reimbursement archive
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_cpda_claim_archive(request):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        username = employee.user
+        uploader_designation = 'Assistant Professor'
+        designation = get_designation_by_user_id(employee.user)
+        if designation:
+            uploader_designation = designation
+
+        archived_files = view_archived(username=username, designation=uploader_designation, src_module="HR")
+        filtered_archived_files = [i for i in archived_files if i.get('file_extra_JSON', {}).get('type') == 'CPDAReimbursement']
+
+        return JsonResponse({'cpda_claim_archive': filtered_archived_files})
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+
+# Appraisal Routes function--------------------------------------
+
+#Appraisal requests
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_appraisal_requests(request):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+    
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        appraisal_requests = Appraisalform.objects.filter(employeeId=user_id)
+        username = employee.user
+        uploader_designation = 'Assistant Professor'
+        designation = get_designation_by_user_id(employee.user)
+        if designation:
+            uploader_designation = designation
+
+        appraisal_requests_json = []
+        for appraisal_request in appraisal_requests:
+            appraisal_requests_json.append({
+                'id': appraisal_request.id,
+                'name': appraisal_request.name,
+                'designation': appraisal_request.designation,
+                'submissionDate': appraisal_request.submissionDate.strftime("%Y-%m-%d") if appraisal_request.submissionDate else None,
+                'is_approved': appraisal_request.approved,
+            })
+
+        return JsonResponse({'appraisal_requests': appraisal_requests_json})
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+# Appraisal Inbox
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_appraisal_inbox(request):
+    # Assuming user_id is derived from request.user
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+    
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+    
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        username = employee.user
+        uploader_designation = 'Assistant Professor'
+        designation = get_designation_by_user_id(employee.user)
+        if designation:
+            uploader_designation = designation
+        
+        inbox = view_inbox(username=username, designation=uploader_designation, src_module="HR")
+        filtered_inbox = [i for i in inbox if i.get('file_extra_JSON', {}).get('type') == 'Appraisal']
+        
+        return JsonResponse({'appraisal_inbox': filtered_inbox})
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+# Appraisal archive
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_appraisal_archive(request):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        username = employee.user
+        uploader_designation = 'Assistant Professor'
+        designation = get_designation_by_user_id(employee.user)
+        if designation:
+            uploader_designation = designation
+
+        archived_files = view_archived(username=username, designation=uploader_designation, src_module="HR")
+        filtered_archived_files = [i for i in archived_files if i.get('file_extra_JSON', {}).get('type') == 'Appraisal']
+
+        return JsonResponse({'appraisal_archive': filtered_archived_files})
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+
+
+
+
+
     

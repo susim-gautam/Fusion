@@ -82,6 +82,24 @@ urlpatterns = [
     url(r'api/get_leave_archive', views.get_leave_archive, name='get_leave_archive'),
     
 
+    url(r'api/get_ltc_requests', views.get_ltc_requests, name='get_ltc_requests'),
+    url(r'api/get_ltc_inbox', views.get_ltc_inbox, name='get_ltc_inbox'),
+    url(r'api/get_ltc_archive', views.get_ltc_archive, name='get_ltc_archive'),
+
+    url(r'api/get_cpda_adv_requests', views.get_cpda_adv_requests, name='get_cpda_adv_requests'),
+    url(r'api/get_cpda_adv_inbox', views.get_cpda_adv_inbox, name='get_cpda_adv_inbox'),
+    url(r'api/get_cpda_adv_archive', views.get_cpda_adv_archive, name='get_cpda_adv_archive'),
+
+
+    url(r'api/get_cpda_claim_requests', views.get_cpda_claim_requests, name='get_cpda_claim_requests'),
+    url(r'api/get_cpda_claim_inbox', views.get_cpda_claim_inbox, name='get_cpda_claim_inbox'),
+    url(r'api/get_cpda_claim_archive', views.get_cpda_claim_archive, name='get_cpda_claim_archive'),
+
+    url(r'api/get_appraisal_requests', views.get_appraisal_requests, name='get_appraisal_requests'),
+    url(r'api/get_appraisal_inbox', views.get_appraisal_inbox, name='get_appraisal_inbox'),
+    url(r'api/get_appraisal_archive', views.get_appraisal_archive, name='get_appraisal_archive'),
+
+
 
 
 
