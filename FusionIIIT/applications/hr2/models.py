@@ -198,7 +198,7 @@ class CPDAAdvanceform(models.Model):
     approved = models.BooleanField(null=True)
     approvedDate = models.DateField(auto_now_add=True, null=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, null=True, related_name='CPDA_created_by')
-    approved_by = models.ForeignKey(User, on_delete=models.CASCADE, null=True, related_name='CPDA_approved_by')
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True) #change 29th oct 
 
 class LeaveForm(models.Model):
     id = models.AutoField(primary_key=True)
