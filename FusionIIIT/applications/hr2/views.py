@@ -2781,6 +2781,52 @@ def get_cpda_adv_requests(request):
 
     return JsonResponse({'error': 'Unauthorized access'}, status=403)
 
+
+#cpda advance form(change 29th oct)
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def submit_cpda_adv_form(request):
+    """
+    POST request to submit a CPDA Advance Form. This endpoint is accessible only to authenticated users.
+    """
+    user = request.user
+
+    # Extracting user ID from the authenticated user
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Extracting form data from the request
+    form_data = request.data
+    try:
+        # Creating the CPDAAdvanceform instance
+        cpda_adv_form = CPDAAdvanceform(
+            employeeId=user_id,
+            name=form_data.get('name'),
+            designation=form_data.get('designation', 'Assistant Professor'),  # Default to 'Assistant Professor'
+            pfNo=form_data.get('pfNo'),
+            purpose=form_data.get('purpose'),
+            amountRequired=form_data.get('amountRequired'),
+            advanceDueAdjustment=form_data.get('advanceDueAdjustment', 0),
+            submissionDate=form_data.get('submissionDate'),
+            balanceAvailable=form_data.get('balanceAvailable', 0),
+            advanceAmountPDA=form_data.get('advanceAmountPDA', 0),
+            amountCheckedInPDA=form_data.get('amountCheckedInPDA', 0),
+            approved=False,  # Form is not approved initially
+            created_by=user,
+        )
+
+        # Validating and saving the form data
+        cpda_adv_form.full_clean()  # Validates the form
+        cpda_adv_form.save()
+
+        return JsonResponse({'message': 'Form submitted successfully'}, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 # cpda advance Inbox
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])

@@ -89,6 +89,7 @@ urlpatterns = [
     url(r'api/get_cpda_adv_requests', views.get_cpda_adv_requests, name='get_cpda_adv_requests'),
     url(r'api/get_cpda_adv_inbox', views.get_cpda_adv_inbox, name='get_cpda_adv_inbox'),
     url(r'api/get_cpda_adv_archive', views.get_cpda_adv_archive, name='get_cpda_adv_archive'),
+    url(r'api/submit_cpda_adv_form/', views.submit_cpda_adv_form, name='submit_cpda_adv_form'), #change 29th oct
 
 
     url(r'api/get_cpda_claim_requests', views.get_cpda_claim_requests, name='get_cpda_claim_requests'),
@@ -98,25 +99,6 @@ urlpatterns = [
     url(r'api/get_appraisal_requests', views.get_appraisal_requests, name='get_appraisal_requests'),
     url(r'api/get_appraisal_inbox', views.get_appraisal_inbox, name='get_appraisal_inbox'),
     url(r'api/get_appraisal_archive', views.get_appraisal_archive, name='get_appraisal_archive'),
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
