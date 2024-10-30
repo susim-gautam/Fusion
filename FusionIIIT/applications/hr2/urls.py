@@ -77,6 +77,10 @@ urlpatterns = [
 
     # New routes for React api Date:28-10-2024 --------------------------------------------------------------------------------------------------
     
+    # search employee
+    url(r'api/search_employee', views.search_employee_by_username, name='search_employee_by_username'),
+    url(r'api/get_my_details', views.get_my_details, name='get_my_details'),
+
     url(r'api/get_leave_requests', views.get_leave_requests, name='get_leave_requests'),
     url(r'api/get_leave_inbox', views.get_leave_inbox, name='get_leave_inbox'),
     url(r'api/get_leave_archive', views.get_leave_archive, name='get_leave_archive'),

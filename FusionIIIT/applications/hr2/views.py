@@ -17,6 +17,8 @@ from django.views.decorators.http import require_http_methods
 from rest_framework.decorators import api_view, permission_classes,authentication_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
+from decimal import Decimal, InvalidOperation
+
 
 
 from html import escape
@@ -489,6 +491,7 @@ def get_designation_by_user_id(user_id):
 
 def search_employee(request):
     search_text = request.GET.get('search', '')
+    
     data = {'designation': 'Assistant Professor'}
     try:
 
@@ -1330,7 +1333,7 @@ def cpda_form(request, id):
                 file_extra_JSON = {"type": "CPDAAdvance"}
 
                 # Create a file representing the CPDA form 
-                file_id = create_file(
+                file_id = create_file(  
                     uploader=uploader,
                     uploader_designation=uploader_designation,
                     receiver=receiver,
@@ -2522,7 +2525,61 @@ def getformcpdaReimbursement(request):
 
 # React json data routes Date 28-10-2024 --------------------------------------------
 
+# search_employee_by_username
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def search_employee_by_username(request):
+    search_text = request.GET.get('search', '')
+    data = {'designation': 'Assistant Professor'}
+    try:
 
+        employee = User.objects.get(username = search_text)
+        holds_designation = HoldsDesignation.objects.filter(user=employee)
+        holds_designation = list(holds_designation)
+        data['designation'] = str(holds_designation[0].designation)
+    except ExtraInfo.DoesNotExist:
+        data = {'error': "Employee doesn't exist"}
+
+    return JsonResponse(data)
+
+
+# get_my_details
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_my_details(request):
+    user = request.user
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+
+    data = {
+        # username designation
+        'username': employee.user.username,
+        'designation': 'Assistant Professor',
+    }
+
+    return JsonResponse(data)
+
+
+
+
+    
+    
+
+
+        
+        
+        
+
+        
 
 # leave Routes function--------------------------------------
 
@@ -2753,19 +2810,16 @@ def get_cpda_adv_requests(request):
         user_id = ExtraInfo.objects.get(user=user).user_id
     except ExtraInfo.DoesNotExist:
         return JsonResponse({'error': 'User ID is required.'}, status=400)
-    
+
     try:
         employee = ExtraInfo.objects.get(user__id=user_id)
     except ExtraInfo.DoesNotExist:
         raise Http404("Employee does not exist! ID doesn't exist.")
-
+    
     if employee.user_type in ['faculty', 'staff', 'student']:
-        cpda_adv_requests = CPDAAdvanceform.objects.filter(employeeId=user_id)
-        username = employee.user
-        uploader_designation = 'Assistant Professor'
-        designation = get_designation_by_user_id(employee.user)
-        if designation:
-            uploader_designation = designation
+        cpda_adv_requests = CPDAAdvanceform.objects.filter(created_by=user)
+
+        print(cpda_adv_requests)
 
         cpda_adv_requests_json = []
         for cpda_adv_request in cpda_adv_requests:
@@ -2776,56 +2830,87 @@ def get_cpda_adv_requests(request):
                 'submissionDate': cpda_adv_request.submissionDate.strftime("%Y-%m-%d") if cpda_adv_request.submissionDate else None,
                 'is_approved': cpda_adv_request.approved,
             })
-
+        
         return JsonResponse({'cpda_adv_requests': cpda_adv_requests_json})
-
+    
     return JsonResponse({'error': 'Unauthorized access'}, status=403)
-
 
 #cpda advance form(change 29th oct)
 @api_view(['POST'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
-def submit_cpda_adv_form(request):
-    """
-    POST request to submit a CPDA Advance Form. This endpoint is accessible only to authenticated users.
-    """
-    user = request.user
 
-    # Extracting user ID from the authenticated user
+def submit_cpda_adv_form(request):
+    """POST request to submit a CPDA Advance Form. This endpoint is accessible only to authenticated users."""
+    user = request.user
     try:
         user_id = ExtraInfo.objects.get(user=user).user_id
     except ExtraInfo.DoesNotExist:
-        return JsonResponse({'error': 'User ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
 
-    # Extracting form data from the request
-    form_data = request.data
-    try:
-        # Creating the CPDAAdvanceform instance
-        cpda_adv_form = CPDAAdvanceform(
-            employeeId=user_id,
-            name=form_data.get('name'),
-            designation=form_data.get('designation', 'Assistant Professor'),  # Default to 'Assistant Professor'
-            pfNo=form_data.get('pfNo'),
-            purpose=form_data.get('purpose'),
-            amountRequired=form_data.get('amountRequired'),
-            advanceDueAdjustment=form_data.get('advanceDueAdjustment', 0),
-            submissionDate=form_data.get('submissionDate'),
-            balanceAvailable=form_data.get('balanceAvailable', 0),
-            advanceAmountPDA=form_data.get('advanceAmountPDA', 0),
-            amountCheckedInPDA=form_data.get('amountCheckedInPDA', 0),
-            approved=False,  # Form is not approved initially
-            created_by=user,
-        )
+    employee = get_object_or_404(ExtraInfo, user__id=user_id)
 
-        # Validating and saving the form data
-        cpda_adv_form.full_clean()  # Validates the form
-        cpda_adv_form.save()
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        try:
+            form_data = json.loads(request.body.decode('utf-8'))
+            form_data['employeeId'] = user_id
 
-        return JsonResponse({'message': 'Form submitted successfully'}, status=status.HTTP_201_CREATED)
+            # Ensure all decimal fields are correctly formatted
+            decimal_fields = ['advanceDueAdjustment', 'balanceAvailable', 'advanceAmountPDA', 'amountCheckedInPDA']
+            for field in decimal_fields:
+                if field in form_data and form_data[field] not in [None, '']:
+                    try:
+                        form_data[field] = Decimal(form_data[field])
+                    except InvalidOperation:
+                        return JsonResponse({'error': f'Invalid decimal value for {field}'}, status=400)
 
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            # Create CPDAAdvanceform instance
+            cpda_adv_form = CPDAAdvanceform.objects.create(
+                name=form_data.get('name'),
+                designation=form_data.get('designation'),
+                pfNo=form_data.get('pfNo'),
+                purpose=form_data.get('purpose'),
+                amountRequired=form_data.get('amountRequired'),
+                advanceDueAdjustment=form_data.get('advanceDueAdjustment'),
+                submissionDate=form_data.get('submissionDate'),
+                balanceAvailable=form_data.get('balanceAvailable'),
+                advanceAmountPDA=form_data.get('advanceAmountPDA'),
+                amountCheckedInPDA=form_data.get('amountCheckedInPDA'),
+                created_by=user
+            )
+
+            receiver_username = request.GET.get('username_reciever')
+            employee_receiver = get_object_or_404(User, username=receiver_username)
+            holds_designation = HoldsDesignation.objects.filter(user=employee_receiver).first()
+            receiver_designation = str(holds_designation.designation) if holds_designation else None
+            
+            if not receiver_designation:
+                return JsonResponse({'error': "Receiver designation does not exist"}, status=404)
+
+            uploader_designation_obj = Designation.objects.filter(name=form_data.get('designation')).first()
+            if not uploader_designation_obj:
+                return JsonResponse({'error': "Uploader designation does not exist"}, status=404)
+
+            src_module = "HR"
+            src_object_id = str(cpda_adv_form.id)
+            file_extra_JSON = {"type": "CPDAAdvance"}
+            file_id = create_file(
+                uploader=employee.user,
+                uploader_designation=uploader_designation_obj,
+                receiver=receiver_username,
+                receiver_designation=receiver_designation,
+                src_module=src_module,
+                src_object_id=src_object_id,
+                file_extra_JSON=file_extra_JSON,
+                attached_file=None
+            )
+
+            messages.success(request, "CPDA form filled successfully")
+            return HttpResponse("Success")
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+    else:
+        return JsonResponse({'error': 'Unauthorized access'}, status=403)
 
 # cpda advance Inbox
 @api_view(['GET'])
