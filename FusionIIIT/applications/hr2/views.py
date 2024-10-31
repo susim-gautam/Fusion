@@ -692,6 +692,7 @@ def track_file(request, id):
     # Assuming file_history is a list of dictionaries
     template = 'hr2Module/ltc_form_trackfile.html'
     file_history = view_history(file_id=id)
+    print(file_history)
 
 
     context = {'file_history': file_history}
@@ -2633,6 +2634,7 @@ def get_leave_inbox(request):
     # Assuming user_id is derived from request.user
     user = request.user
 
+
     try:
         user_id = ExtraInfo.objects.get(user=user).user_id
     except ExtraInfo.DoesNotExist:
@@ -2689,6 +2691,31 @@ def get_leave_archive(request):
         return JsonResponse({'leave_archive': filtered_archived_files})
 
     return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+
+
+
+
+# code for tracking all the workflows files
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def track_file_react(request, id):
+    # Fetching the file history as a list of dictionaries
+    file_history = view_history(file_id=id)
+
+    # Create a JSON response for React
+    response_data = {
+        'file_history': file_history
+    }
+    return JsonResponse(response_data)
+
+
+
+
+
+
 
 
 
