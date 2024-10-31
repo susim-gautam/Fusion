@@ -2867,6 +2867,7 @@ def get_cpda_adv_requests(request):
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 
+
 def submit_cpda_adv_form(request):
     """POST request to submit a CPDA Advance Form. This endpoint is accessible only to authenticated users."""
     user = request.user
@@ -2891,6 +2892,15 @@ def submit_cpda_adv_form(request):
                     except InvalidOperation:
                         return JsonResponse({'error': f'Invalid decimal value for {field}'}, status=400)
 
+            # Get the designation of the uploader
+            holds_designation = HoldsDesignation.objects.filter(user=employee.user)
+            if not holds_designation.exists():
+                return JsonResponse({'error': "Uploader does not hold any designation"}, status=404)
+
+            holds_designation_list = list(holds_designation)
+            form_data['designation'] = str(holds_designation_list[0].designation)
+            uploader_designation_obj = Designation.objects.filter(name=form_data['designation']).first()
+
             # Create CPDAAdvanceform instance
             cpda_adv_form = CPDAAdvanceform.objects.create(
                 name=form_data.get('name'),
@@ -2910,11 +2920,10 @@ def submit_cpda_adv_form(request):
             employee_receiver = get_object_or_404(User, username=receiver_username)
             holds_designation = HoldsDesignation.objects.filter(user=employee_receiver).first()
             receiver_designation = str(holds_designation.designation) if holds_designation else None
-            
+
             if not receiver_designation:
                 return JsonResponse({'error': "Receiver designation does not exist"}, status=404)
 
-            uploader_designation_obj = Designation.objects.filter(name=form_data.get('designation')).first()
             if not uploader_designation_obj:
                 return JsonResponse({'error': "Uploader designation does not exist"}, status=404)
 
@@ -2931,14 +2940,12 @@ def submit_cpda_adv_form(request):
                 file_extra_JSON=file_extra_JSON,
                 attached_file=None
             )
-
             messages.success(request, "CPDA form filled successfully")
             return HttpResponse("Success")
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON data'}, status=400)
     else:
         return JsonResponse({'error': 'Unauthorized access'}, status=403)
-
 # cpda advance Inbox
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])
