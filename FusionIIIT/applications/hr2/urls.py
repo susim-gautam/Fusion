@@ -85,6 +85,7 @@ urlpatterns = [
     url(r'api/get_leave_inbox', views.get_leave_inbox, name='get_leave_inbox'),
     url(r'api/get_leave_archive', views.get_leave_archive, name='get_leave_archive'),
     url(r'^api/submit_leave_form', views.submit_leave_form, name='submit_leave_form'),
+    url(r'api/view_leave_form_data/(?P<id>\d+)/$', views.view_leave_form_data, name='view_leave_form_data'), #change 1st nov 2024
 
 
     #url for tracking the files of all workflow
@@ -109,7 +110,7 @@ urlpatterns = [
     url(r'api/get_cpda_adv_inbox', views.get_cpda_adv_inbox, name='get_cpda_adv_inbox'),
     url(r'api/get_cpda_adv_archive', views.get_cpda_adv_archive, name='get_cpda_adv_archive'),
     url(r'api/submit_cpda_adv_form/', views.submit_cpda_adv_form, name='submit_cpda_adv_form'), #change 29th oct 2024
-    url(r'api/view_cpda_adv_form/(?P<id>\d+)/$', views.view_cpda_adv_form, name='view_cpda_adv_form'), #change 1st nov 2024
+    url(r'api/view_cpda_adv_form_data/(?P<id>\d+)/$', views.view_cpda_adv_form_data, name='view_cpda_adv_form_data'), #change 1st nov 2024
 
 
     url(r'api/get_cpda_claim_requests', views.get_cpda_claim_requests, name='get_cpda_claim_requests'),

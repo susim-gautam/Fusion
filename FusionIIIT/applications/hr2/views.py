@@ -2680,7 +2680,58 @@ def submit_leave_form(request):
         return JsonResponse({'error': 'Unauthorized access'}, status=403)
               
 
+# view leave form
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def view_leave_form_data(request, id):
+    user = request.user
 
+    # Check if the user is the one who filled the form or the receiver
+    try:
+        leave_form = LeaveForm.objects.get(id=id)
+    except LeaveForm.DoesNotExist:
+        return JsonResponse({'error': 'Leave Form not found'}, status=404)
+
+    associated_file = get_object_or_404(File, src_object_id=id, src_module='HR')
+
+    # Ensure the user is either the creator or the receiver
+    try:
+        filled_by_user = leave_form.created_by
+        tracking = Tracking.objects.get(file_id=associated_file)
+        receiver = tracking.receiver_id
+    except (User.DoesNotExist, Tracking.DoesNotExist):
+        return JsonResponse({'error': 'User or Tracking information not found'}, status=404)
+
+    if user != filled_by_user and user != receiver:
+        return JsonResponse({'error': 'You do not have permission to view this form'}, status=403)
+    
+    # get form data
+    form_data = {
+        'id': leave_form.id,
+        'employeeId': leave_form.employeeId,
+        'name': leave_form.name,
+        'designation': leave_form.designation,
+        'submissionDate': leave_form.submissionDate.strftime("%Y-%m-%d") if leave_form.submissionDate else None,
+        'departmentInfo': leave_form.departmentInfo,
+        'pfNo': leave_form.pfNo,
+        'natureOfLeave': leave_form.natureOfLeave,
+        'leaveStartDate': leave_form.leaveStartDate.strftime("%Y-%m-%d") if leave_form.leaveStartDate else None,
+        'leaveEndDate': leave_form.leaveEndDate.strftime("%Y-%m-%d") if leave_form.leaveEndDate else None,
+        'purposeOfLeave': leave_form.purposeOfLeave,
+        'addressDuringLeave': leave_form.addressDuringLeave,
+        'academicResponsibility': leave_form.academicResponsibility,
+        'addministrativeResponsibiltyAssigned': leave_form.addministrativeResponsibiltyAssigned,
+    }
+
+    # get file id
+    file_id = associated_file.id
+
+    form_data['file_id'] = file_id
+
+    return JsonResponse(form_data)
+
+    
 
 
 #leave requests
@@ -3056,7 +3107,7 @@ from django.contrib.auth.models import User
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
-def view_cpda_adv_form(request, id):
+def view_cpda_adv_form_data(request, id):
     user = request.user
 
     # Check if the user is the one who filled the form or the receiver
