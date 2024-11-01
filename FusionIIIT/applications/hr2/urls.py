@@ -84,6 +84,8 @@ urlpatterns = [
     url(r'api/get_leave_requests', views.get_leave_requests, name='get_leave_requests'),
     url(r'api/get_leave_inbox', views.get_leave_inbox, name='get_leave_inbox'),
     url(r'api/get_leave_archive', views.get_leave_archive, name='get_leave_archive'),
+    url(r'^api/submit_leave_form', views.submit_leave_form, name='submit_leave_form'),
+
 
     #url for tracking the files of all workflow
     url(r'api/get_track_file/(?P<id>\d+)/$', views.track_file_react, name='track_file_react'),

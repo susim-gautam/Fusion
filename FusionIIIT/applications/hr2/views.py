@@ -21,6 +21,8 @@ from decimal import Decimal, InvalidOperation
 
 
 
+
+
 from html import escape
 from io import BytesIO
 import re
@@ -2585,6 +2587,102 @@ def get_my_details(request):
 # leave Routes function--------------------------------------
 
 
+# submit_leave_form
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def submit_leave_form(request):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+    employee = get_object_or_404(ExtraInfo, user__id=user_id)
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        try:
+            form_data = json.loads(request.body.decode('utf-8'))
+            
+
+            form_data['employeeId'] = user_id
+
+            # Ensure all decimal fields are correctly formatted
+            decimal_fields = ['advanceDueAdjustment', 'balanceAvailable', 'advanceAmountPDA', 'amountCheckedInPDA']
+            for field in decimal_fields:
+                if field in form_data and form_data[field] not in [None, '']:
+                    try:
+                        form_data[field] = Decimal(form_data[field])
+                       
+                    except InvalidOperation:
+                        
+                        return JsonResponse({'error': f'Invalid decimal value for {field}'}, status=400)
+
+            # Get the designation of the uploader
+            holds_designation = HoldsDesignation.objects.filter(user=employee.user)
+            if not holds_designation.exists():
+                
+                return JsonResponse({'error': "Uploader does not hold any designation"}, status=404)
+
+            holds_designation_list = list(holds_designation)
+            form_data['designation'] = str(holds_designation_list[0].designation)
+            uploader_designation_obj = Designation.objects.filter(name=form_data['designation']).first()
+
+            # Create a leave form
+            leave_form = LeaveForm.objects.create(
+                employeeId=form_data['employeeId'],
+                name=form_data['name'],
+                designation=form_data['designation'],
+                submissionDate=form_data['submissionDate'],
+                departmentInfo=form_data['departmentInfo'],
+                pfNo=form_data['pfNo'],
+                natureOfLeave=form_data['natureOfLeave'],
+                leaveStartDate=form_data['leaveStartDate'],
+                leaveEndDate=form_data['leaveEndDate'],
+                purposeOfLeave=form_data['purposeOfLeave'],
+                addressDuringLeave=form_data['addressDuringLeave'],
+                academicResponsibility=form_data['academicResponsibility'],
+                addministrativeResponsibiltyAssigned=form_data['addministrativeResponsibiltyAssigned'],
+                created_by=user
+            )
+            
+
+            uploader = employee.user
+            uploader_designation = uploader_designation_obj.name
+            receiver = form_data['username_reciever']
+            receiver_designation = form_data['designation_reciever']
+            src_module = "HR"
+            src_object_id = str(leave_form.id)
+            file_extra_JSON = {"type": "Leave"}
+
+            # Create a file representing the leave form and send it to HR admin
+            file_id = create_file(
+                uploader=uploader,
+                uploader_designation=uploader_designation,
+                receiver=receiver,
+                receiver_designation=receiver_designation,
+                src_module=src_module,
+                src_object_id=src_object_id,
+                file_extra_JSON=file_extra_JSON,
+                attached_file=None  # Attach any file if necessary
+            )
+            
+
+            return JsonResponse({'message': 'Leave form submitted successfully!'}, status=201)
+        except json.JSONDecodeError:
+            
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+        except Exception as e:
+            
+            return JsonResponse({'error': str(e)}, status=400)
+    else:
+        return JsonResponse({'error': 'Unauthorized access'}, status=403)
+              
+
+
+
+
 #leave requests
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])
@@ -2967,14 +3065,17 @@ def view_cpda_adv_form(request, id):
     except CPDAAdvanceform.DoesNotExist:
         return JsonResponse({'error': 'CPDA Advance Form not found'}, status=404)
 
+    associated_file = get_object_or_404(File, src_object_id=id, src_module='HR')
+
+    # Ensure the user is either the creator or the receiver
     try:
         filled_by_user = cpda_adv_form.created_by
-        
-    except User.DoesNotExist:
-        return JsonResponse({'error': 'Receiver not found'}, status=404)
+        tracking = Tracking.objects.get(file_id=associated_file)
+        receiver = tracking.receiver_id
+    except (User.DoesNotExist, Tracking.DoesNotExist):
+        return JsonResponse({'error': 'User or Tracking information not found'}, status=404)
 
-    # Check if the user is either the creator or the receiver
-    if user != filled_by_user :
+    if user != filled_by_user and user != receiver:
         return JsonResponse({'error': 'You do not have permission to view this form'}, status=403)
 
     # Convert the form data to JSON
@@ -2990,20 +3091,12 @@ def view_cpda_adv_form(request, id):
         'balanceAvailable': str(cpda_adv_form.balanceAvailable),
         'advanceAmountPDA': str(cpda_adv_form.advanceAmountPDA),
         'amountCheckedInPDA': str(cpda_adv_form.amountCheckedInPDA),
-        'created_by': cpda_adv_form.created_by.username
+        'created_by': cpda_adv_form.created_by.username,
+        'file_id': associated_file.id
     }
 
-    # fetch file using form id using file model
-    
-
-    associated_file = get_object_or_404(File, src_object_id=id, src_module='HR')
-    form_data['file_id'] = associated_file.id
-    
-
-
     return JsonResponse(form_data)
-
-    
+   
 
 
 
