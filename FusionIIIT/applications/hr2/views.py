@@ -2946,7 +2946,68 @@ def submit_cpda_adv_form(request):
             return JsonResponse({'error': 'Invalid JSON data'}, status=400)
     else:
         return JsonResponse({'error': 'Unauthorized access'}, status=403)
-# cpda advance Inbox
+ # cpda advance Inbox
+
+from django.http import JsonResponse, Http404
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+from .models import CPDAAdvanceform, ExtraInfo
+from django.contrib.auth.models import User
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def view_cpda_adv_form(request, id):
+    user = request.user
+
+    # Check if the user is the one who filled the form or the receiver
+    try:
+        cpda_adv_form = CPDAAdvanceform.objects.get(id=id)
+    except CPDAAdvanceform.DoesNotExist:
+        return JsonResponse({'error': 'CPDA Advance Form not found'}, status=404)
+
+    try:
+        filled_by_user = cpda_adv_form.created_by
+        
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'Receiver not found'}, status=404)
+
+    # Check if the user is either the creator or the receiver
+    if user != filled_by_user :
+        return JsonResponse({'error': 'You do not have permission to view this form'}, status=403)
+
+    # Convert the form data to JSON
+    form_data = {
+        'id': cpda_adv_form.id,
+        'name': cpda_adv_form.name,
+        'designation': cpda_adv_form.designation,
+        'pfNo': cpda_adv_form.pfNo,
+        'purpose': cpda_adv_form.purpose,
+        'amountRequired': cpda_adv_form.amountRequired,
+        'advanceDueAdjustment': str(cpda_adv_form.advanceDueAdjustment),
+        'submissionDate': cpda_adv_form.submissionDate.strftime("%Y-%m-%d") if cpda_adv_form.submissionDate else None,
+        'balanceAvailable': str(cpda_adv_form.balanceAvailable),
+        'advanceAmountPDA': str(cpda_adv_form.advanceAmountPDA),
+        'amountCheckedInPDA': str(cpda_adv_form.amountCheckedInPDA),
+        'created_by': cpda_adv_form.created_by.username
+    }
+
+    # fetch file using form id using file model
+    
+
+    associated_file = get_object_or_404(File, src_object_id=id, src_module='HR')
+    form_data['file_id'] = associated_file.id
+    
+
+
+    return JsonResponse(form_data)
+
+    
+
+
+
+
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
