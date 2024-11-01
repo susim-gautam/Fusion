@@ -2732,6 +2732,124 @@ def view_leave_form_data(request, id):
     return JsonResponse(form_data)
 
     
+# leave file handle
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+
+
+def leave_file_handle(request, id):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+    employee = get_object_or_404(ExtraInfo, user__id=user_id)
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        # Check if request body is empty
+        if not request.body:
+            return JsonResponse({'error': 'Request body is empty.'}, status=400)
+
+        try:
+            form_data = json.loads(request.body.decode('utf-8'))
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON format.'}, status=400)
+
+        # # print form_data
+        # print(form_data)
+
+    
+
+        file_id = id 
+        form_id = form_data.get('form_id') 
+
+        from_user = employee.user.username
+        action = form_data.get('action') 
+
+        # Get the designation of the uploader
+        holds_designation = HoldsDesignation.objects.filter(user=employee.user)
+        if not holds_designation.exists():
+            return JsonResponse({'error': "Uploader does not hold any designation"}, status=404)
+
+        from_designation = str(holds_designation[0].designation)
+
+        # Receiver details
+        receiver = form_data.get('username_receiver') 
+        receiver_designation = form_data.get('designation_receiver') 
+        remark = form_data.get('remark', 'vishal testing')
+
+        try:
+            leave_form = LeaveForm.objects.get(id=form_id)
+        except LeaveForm.DoesNotExist:
+            return JsonResponse({"error": "LeaveForm object with the provided ID does not exist"}, status=404)
+        
+        current_owner = get_current_file_owner(file_id)
+
+        if action == '0':  # Forward
+            remarks = f"Forwarded by {current_owner} to {receiver}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=receiver,
+                receiver_designation=receiver_designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            return JsonResponse({"message": "File forwarded successfully"}, status=200)
+
+        elif action == '1':  # Reject
+            remarks = f"Rejected by {current_owner}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=leave_form.name,
+                receiver_designation=leave_form.designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            return JsonResponse({"message": "File rejected successfully"}, status=200)
+
+        elif action == '2':  # Approve
+            remarks = f"Approved by {current_owner}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=leave_form.name,
+                receiver_designation=leave_form.designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            leave_form.approved = True
+            leave_form.approvedDate = timezone.now()
+            leave_form.approved_by = current_owner
+            leave_form.save()
+            return JsonResponse({"message": "File approved successfully"}, status=200)
+
+        elif action == '3':  # Archive
+            is_archived = archive_file(file_id=file_id)
+            if is_archived:
+                return JsonResponse({"error": "Error archiving file"}, status=400)
+            return JsonResponse({"message": "File archived successfully"}, status=200)
+
+        elif action == '4':  # Unarchive
+            is_unarchived = unarchive_file(file_id=file_id)
+            if is_unarchived:
+                return JsonResponse({"error": "Error unarchiving file"}, status=400)
+            return JsonResponse({"message": "File unarchived successfully"}, status=200)
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+
+
+    
+
 
 
 #leave requests
