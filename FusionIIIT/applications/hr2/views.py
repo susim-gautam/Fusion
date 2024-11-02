@@ -2840,15 +2840,17 @@ def leave_file_handle(request, id):
 
         elif action == '3':  # Archive
             is_archived = archive_file(file_id=file_id)
-            if is_archived:
-                return JsonResponse({"error": "Error archiving file"}, status=400)
-            return JsonResponse({"message": "File archived successfully"}, status=200)
+            if (is_archived):
+                return JsonResponse({"message": "File archived successfully"}, status=200)
+            return JsonResponse({"error": "Error archiving file"}, status=400)    
+            
 
         elif action == '4':  # Unarchive
             is_unarchived = unarchive_file(file_id=file_id)
             if is_unarchived:
-                return JsonResponse({"error": "Error unarchiving file"}, status=400)
-            return JsonResponse({"message": "File unarchived successfully"}, status=200)
+                return JsonResponse({"message": "File unarchived successfully"}, status=200)
+            return JsonResponse({"error": "Error unarchiving file"}, status=400)    
+            
 
     return JsonResponse({'error': 'Unauthorized access'}, status=403)
 
