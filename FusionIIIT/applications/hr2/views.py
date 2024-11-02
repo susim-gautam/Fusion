@@ -2693,12 +2693,15 @@ def view_leave_form_data(request, id):
     except LeaveForm.DoesNotExist:
         return JsonResponse({'error': 'Leave Form not found'}, status=404)
 
-    associated_file = get_object_or_404(File, src_object_id=id, src_module='HR')
+    associated_files = File.objects.filter(src_object_id=id, src_module='HR')
+
+    if not associated_files.exists():
+        return JsonResponse({'error': 'Associated file not found'}, status=404)
 
     # Ensure the user is either the creator or the receiver
     try:
         filled_by_user = leave_form.created_by
-        tracking_entries = Tracking.objects.filter(file_id=associated_file).order_by('receive_date')
+        tracking_entries = Tracking.objects.filter(file_id__in=associated_files).order_by('receive_date')
 
         if not tracking_entries.exists():
             return JsonResponse({'error': 'Tracking information not found'}, status=404)
@@ -2709,7 +2712,10 @@ def view_leave_form_data(request, id):
 
     if user != filled_by_user and user != receiver:
         return JsonResponse({'error': 'You do not have permission to view this form'}, status=403)
-    
+
+    # Get the first associated file for consistency
+    associated_file = associated_files.first()
+
     # Get form data
     form_data = {
         'id': leave_form.id,
@@ -2733,13 +2739,6 @@ def view_leave_form_data(request, id):
     form_data['file_id'] = file_id
 
     return JsonResponse(form_data)
- 
-    
-    
-    
-    
-    # leave file handle
-
 @api_view(['POST'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
