@@ -2908,6 +2908,10 @@ def leave_edit_handle(request, id):
         leave_form.addministrativeResponsibiltyAssigned = form_data.get('addministrativeResponsibiltyAssigned', leave_form.addministrativeResponsibiltyAssigned)
         leave_form.save()
 
+        try:
+            leave_form = LeaveForm.objects.get(id=form_id)
+        except LeaveForm.DoesNotExist:
+            return JsonResponse({"error": "LeaveForm object with the provided ID does not exist"}, status=404)
 
 
 
