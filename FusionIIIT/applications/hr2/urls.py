@@ -87,6 +87,10 @@ urlpatterns = [
     url(r'^api/submit_leave_form', views.submit_leave_form, name='submit_leave_form'),
     url(r'api/view_leave_form_data/(?P<id>\d+)/$', views.view_leave_form_data, name='view_leave_form_data'), #change 1st nov 2024
     url(r'api/leave_file_handle/(?P<id>\d+)/$', views.leave_file_handle, name='leave_file_handle'),
+    url(r'api/get_form_id/(?P<id>\d+)/$', views.get_form_id, name='get_form_id'),
+    url(r'api/leave_edit_handle/(?P<id>\d+)/$', views.leave_edit_handle, name='leave_edit_handle'),
+    
+    
 
 
     #url for tracking the files of all workflow

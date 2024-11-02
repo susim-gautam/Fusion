@@ -2698,15 +2698,19 @@ def view_leave_form_data(request, id):
     # Ensure the user is either the creator or the receiver
     try:
         filled_by_user = leave_form.created_by
-        tracking = Tracking.objects.get(file_id=associated_file)
-        receiver = tracking.receiver_id
+        tracking_entries = Tracking.objects.filter(file_id=associated_file).order_by('receive_date')
+
+        if not tracking_entries.exists():
+            return JsonResponse({'error': 'Tracking information not found'}, status=404)
+
+        receiver = tracking_entries.latest('receive_date').receiver_id  # Get the latest tracking entry by receive_date
     except (User.DoesNotExist, Tracking.DoesNotExist):
         return JsonResponse({'error': 'User or Tracking information not found'}, status=404)
 
     if user != filled_by_user and user != receiver:
         return JsonResponse({'error': 'You do not have permission to view this form'}, status=403)
     
-    # get form data
+    # Get form data
     form_data = {
         'id': leave_form.id,
         'employeeId': leave_form.employeeId,
@@ -2724,17 +2728,19 @@ def view_leave_form_data(request, id):
         'addministrativeResponsibiltyAssigned': leave_form.addministrativeResponsibiltyAssigned,
     }
 
-    # get file id
+    # Get file id
     file_id = associated_file.id
-
     form_data['file_id'] = file_id
 
     return JsonResponse(form_data)
-
+ 
     
-# leave file handle
+    
+    
+    
+    # leave file handle
 
-@api_view(['GET'])
+@api_view(['POST'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 
@@ -2780,7 +2786,7 @@ def leave_file_handle(request, id):
         # Receiver details
         receiver = form_data.get('username_receiver') 
         receiver_designation = form_data.get('designation_receiver') 
-        remark = form_data.get('remark', 'vishal testing')
+        remark = form_data.get('remark', '')
 
         try:
             leave_form = LeaveForm.objects.get(id=form_id)
@@ -2848,7 +2854,146 @@ def leave_file_handle(request, id):
 
 
 
+# edit leave form data only by the reciever
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+
+def leave_edit_handle(request, id):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+    employee = get_object_or_404(ExtraInfo, user__id=user_id)
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        # Check if request body is empty
+        if not request.body:
+            return JsonResponse({'error': 'Request body is empty.'}, status=400)
+
+        try:
+            form_data = json.loads(request.body.decode('utf-8'))
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON format.'}, status=400)
+
+        # # print form_data
+        # print(form_data)
+
     
+
+        file_id = id 
+        form_id = form_data.get('form_id') 
+
+        # edit leave form
+        try:
+            leave_form = LeaveForm.objects.get(id=form_id)
+        except LeaveForm.DoesNotExist:
+            return JsonResponse({"error": "LeaveForm object with the provided ID does not exist"}, status=404)
+        
+
+        # edit everything except name and designation
+
+        leave_form.submissionDate = form_data.get('submissionDate', leave_form.submissionDate)
+        leave_form.departmentInfo = form_data.get('departmentInfo', leave_form.departmentInfo)
+        leave_form.pfNo = form_data.get('pfNo', leave_form.pfNo)
+        leave_form.natureOfLeave = form_data.get('natureOfLeave', leave_form.natureOfLeave)
+        leave_form.leaveStartDate = form_data.get('leaveStartDate', leave_form.leaveStartDate)
+        leave_form.leaveEndDate = form_data.get('leaveEndDate', leave_form.leaveEndDate)
+        leave_form.purposeOfLeave = form_data.get('purposeOfLeave', leave_form.purposeOfLeave)
+        leave_form.addressDuringLeave = form_data.get('addressDuringLeave', leave_form.addressDuringLeave)
+        leave_form.academicResponsibility = form_data.get('academicResponsibility', leave_form.academicResponsibility)
+        leave_form.addministrativeResponsibiltyAssigned = form_data.get('addministrativeResponsibiltyAssigned', leave_form.addministrativeResponsibiltyAssigned)
+        leave_form.save()
+
+
+
+
+
+
+
+        from_user = employee.user.username
+        action = form_data.get('action') 
+
+        # Get the designation of the uploader
+        holds_designation = HoldsDesignation.objects.filter(user=employee.user)
+        if not holds_designation.exists():
+            return JsonResponse({'error': "Uploader does not hold any designation"}, status=404)
+
+        from_designation = str(holds_designation[0].designation)
+
+        # Receiver details
+        receiver = form_data.get('username_receiver') 
+        receiver_designation = form_data.get('designation_receiver') 
+        remark = form_data.get('remark', '')
+
+        try:
+            leave_form = LeaveForm.objects.get(id=form_id)
+        except LeaveForm.DoesNotExist:
+            return JsonResponse({"error": "LeaveForm object with the provided ID does not exist"}, status=404)
+        
+        current_owner = get_current_file_owner(file_id)
+
+        if action == '0':  # Forward
+            remarks = f"Edited & Forwarded by {current_owner} to {receiver}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=receiver,
+                receiver_designation=receiver_designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            return JsonResponse({"message": "File forwarded successfully"}, status=200)
+
+        elif action == '1':  # Reject
+            remarks = f"Edited & Rejected by {current_owner}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=leave_form.name,
+                receiver_designation=leave_form.designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            return JsonResponse({"message": "File rejected successfully"}, status=200)
+
+        elif action == '2':  # Approve
+            remarks = f"Edited & Approved by {current_owner}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=leave_form.name,
+                receiver_designation=leave_form.designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            leave_form.approved = True
+            leave_form.approvedDate = timezone.now()
+            leave_form.approved_by = current_owner
+            leave_form.save()
+            return JsonResponse({"message": "File approved successfully"}, status=200)
+
+        elif action == '3':  # Archive
+            is_archived = archive_file(file_id=file_id)
+            if is_archived:
+                return JsonResponse({"error": "Error archiving file"}, status=400)
+            return JsonResponse({"message": "File archived successfully"}, status=200)
+
+        elif action == '4':  # Unarchive
+            is_unarchived = unarchive_file(file_id=file_id)
+            if is_unarchived:
+                return JsonResponse({"error": "Error unarchiving file"}, status=400)
+            return JsonResponse({"message": "File unarchived successfully"}, status=200)
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+
 
 
 
@@ -2891,7 +3036,38 @@ def get_leave_requests(request):
 
     return JsonResponse({'error': 'Unauthorized access'}, status=403)
      
+# get form_id using file_id
 
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_form_id(request, id):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+    
+    try:
+        employee = ExtraInfo.objects.get(user__id=user_id)
+    except ExtraInfo.DoesNotExist:
+        raise Http404("Employee does not exist! ID doesn't exist.")
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        associated_file = get_object_or_404(File, id=id)
+        
+        try:
+            tracking_entries = Tracking.objects.filter(file_id=associated_file)
+            if not tracking_entries.exists():
+                return JsonResponse({'error': 'Tracking information not found'}, status=404)
+            form_id = associated_file.src_object_id  # assuming src_object_id contains the form_id
+        except Tracking.DoesNotExist:
+            return JsonResponse({'error': 'Tracking information not found'}, status=404)
+        
+        return JsonResponse({'form_id': form_id}, status=200)
+    
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
 
 #leave Inbox
 @api_view(['GET'])
