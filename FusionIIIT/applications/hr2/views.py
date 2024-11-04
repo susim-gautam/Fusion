@@ -2739,10 +2739,12 @@ def view_leave_form_data(request, id):
     form_data['file_id'] = file_id
 
     return JsonResponse(form_data)
+
+
+
 @api_view(['POST'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
-
 
 def leave_file_handle(request, id):
     user = request.user
@@ -2859,7 +2861,6 @@ def leave_file_handle(request, id):
 @api_view(['POST'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
-
 def leave_edit_handle(request, id):
     user = request.user
 
@@ -3420,7 +3421,10 @@ def view_cpda_adv_form_data(request, id):
     # Ensure the user is either the creator or the receiver
     try:
         filled_by_user = cpda_adv_form.created_by
-        tracking = Tracking.objects.get(file_id=associated_file)
+        try:
+            tracking = Tracking.objects.get(file_id=associated_file)
+        except Tracking.MultipleObjectsReturned:
+            tracking = Tracking.objects.filter(file_id=associated_file).first()
         receiver = tracking.receiver_id
     except (User.DoesNotExist, Tracking.DoesNotExist):
         return JsonResponse({'error': 'User or Tracking information not found'}, status=404)
@@ -3446,7 +3450,247 @@ def view_cpda_adv_form_data(request, id):
     }
 
     return JsonResponse(form_data)
-   
+
+
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def cpda_adv_file_handle(request, id):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+    employee = get_object_or_404(ExtraInfo, user__id=user_id)
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        # Check if request body is empty
+        if not request.body:
+            return JsonResponse({'error': 'Request body is empty.'}, status=400)
+
+        try:
+            form_data = json.loads(request.body.decode('utf-8'))
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON format.'}, status=400)
+
+        file_id = id
+        form_id = form_data.get('form_id')
+
+        from_user = employee.user.username
+        action = form_data.get('action')
+
+        # Get the designation of the uploader
+        holds_designation = HoldsDesignation.objects.filter(user=employee.user)
+        if not holds_designation.exists():
+            return JsonResponse({'error': "Uploader does not hold any designation"}, status=404)
+
+        from_designation = str(holds_designation[0].designation)
+
+        # Receiver details
+        receiver = form_data.get('username_receiver')
+        receiver_designation = form_data.get('designation_receiver')
+        remark = form_data.get('remark', '')
+
+        try:
+            cpda_adv_form = CPDAAdvanceform.objects.get(id=form_id)
+        except CPDAAdvanceform.DoesNotExist:
+            return JsonResponse({"error": "CPDAAdvanceform object with the provided ID does not exist"}, status=404)
+        
+        current_owner = get_current_file_owner(file_id)
+
+        if action == '0':  # Forward
+            remarks = f"Forwarded by {current_owner} to {receiver}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=receiver,
+                receiver_designation=receiver_designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            return JsonResponse({"message": "File forwarded successfully"}, status=200)
+
+        elif action == '1':  # Reject
+            remarks = f"Rejected by {current_owner}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=cpda_adv_form.name,
+                receiver_designation=cpda_adv_form.designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            return JsonResponse({"message": "File rejected successfully"}, status=200)
+
+        elif action == '2':  # Approve
+            remarks = f"Approved by {current_owner}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=cpda_adv_form.name,
+                receiver_designation=cpda_adv_form.designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            cpda_adv_form.approved = True
+            cpda_adv_form.approvedDate = timezone.now()
+            cpda_adv_form.approved_by = current_owner
+            cpda_adv_form.save()
+            return JsonResponse({"message": "File approved successfully"}, status=200)
+
+        elif action == '3':  # Archive
+            is_archived = archive_file(file_id=file_id)
+            if is_archived:
+                return JsonResponse({"message": "File archived successfully"}, status=200)
+            return JsonResponse({"error": "Error archiving file"}, status=400)    
+
+        elif action == '4':  # Unarchive
+            is_unarchived = unarchive_file(file_id=file_id)
+            if is_unarchived:
+                return JsonResponse({"message": "File unarchived successfully"}, status=200)
+            return JsonResponse({"error": "Error unarchiving file"}, status=400)    
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+
+
+
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def cpda_adv_edit_handle(request, id):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+    employee = get_object_or_404(ExtraInfo, user__id=user_id)
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        # Check if request body is empty
+        if not request.body:
+            return JsonResponse({'error': 'Request body is empty.'}, status=400)
+
+        try:
+            form_data = json.loads(request.body.decode('utf-8'))
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON format.'}, status=400)
+
+        file_id = id 
+        form_id = form_data.get('form_id') 
+
+        # edit CPDA Advance form
+        try:
+            cpda_adv_form = CPDAAdvanceform.objects.get(id=form_id)
+        except CPDAAdvanceform.DoesNotExist:
+            return JsonResponse({"error": "CPDAAdvanceform object with the provided ID does not exist"}, status=404)
+        
+        # edit everything except name and designation
+        cpda_adv_form.submissionDate = form_data.get('submissionDate', cpda_adv_form.submissionDate)
+        # cpda_advance_form.departmentInfo = form_data.get('departmentInfo', cpda_advance_form.departmentInfo)
+        cpda_adv_form.pfNo = form_data.get('pfNo', cpda_adv_form.pfNo)
+        cpda_adv_form.purpose = form_data.get('purpose', cpda_adv_form.purpose)
+        cpda_adv_form.amountRequired = form_data.get('amountRequired', cpda_adv_form.amountRequired)
+        cpda_adv_form.advanceDueAdjustment = form_data.get('advanceDueAdjustment', cpda_adv_form.advanceDueAdjustment)
+        cpda_adv_form.balanceAvailable = form_data.get('balanceAvailable', cpda_adv_form.balanceAvailable)
+        cpda_adv_form.advanceAmountPDA = form_data.get('advanceAmountPDA', cpda_adv_form.advanceAmountPDA)
+        cpda_adv_form.amountCheckedInPDA = form_data.get('amountCheckedInPDA', cpda_adv_form.amountCheckedInPDA)
+        cpda_adv_form.save()
+
+        try:
+            cpda_adv_form = CPDAAdvanceform.objects.get(id=form_id)
+        except CPDAAdvanceform.DoesNotExist:
+            return JsonResponse({"error": "CPDAAdvanceform object with the provided ID does not exist"}, status=404)
+
+        from_user = employee.user.username
+        action = form_data.get('action') 
+
+        # Get the designation of the uploader
+        holds_designation = HoldsDesignation.objects.filter(user=employee.user)
+        if not holds_designation.exists():
+            return JsonResponse({'error': "Uploader does not hold any designation"}, status=404)
+
+        from_designation = str(holds_designation[0].designation)
+
+        # Receiver details
+        receiver = form_data.get('username_receiver') 
+        receiver_designation = form_data.get('designation_receiver') 
+        remark = form_data.get('remark', '')
+
+        try:
+            cpda_adv_form = CPDAAdvanceform.objects.get(id=form_id)
+        except CPDAAdvanceform.DoesNotExist:
+            return JsonResponse({"error": "CPDAAdvanceform object with the provided ID does not exist"}, status=404)
+        
+        current_owner = get_current_file_owner(file_id)
+
+        if action == '0':  # Forward
+            remarks = f"Edited & Forwarded by {current_owner} to {receiver}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=receiver,
+                receiver_designation=receiver_designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            return JsonResponse({"message": "File forwarded successfully"}, status=200)
+
+        elif action == '1':  # Reject
+            remarks = f"Edited & Rejected by {current_owner}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=cpda_adv_form.name,
+                receiver_designation=cpda_adv_form.designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            return JsonResponse({"message": "File rejected successfully"}, status=200)
+
+        elif action == '2':  # Approve
+            remarks = f"Edited & Approved by {current_owner}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=cpda_adv_form.name,
+                receiver_designation=cpda_adv_form.designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            cpda_adv_form.approved = True
+            cpda_adv_form.approvedDate = timezone.now()
+            cpda_adv_form.approved_by = current_owner
+            cpda_adv_form.save()
+            return JsonResponse({"message": "File approved successfully"}, status=200)
+
+        elif action == '3':  # Archive
+            is_archived = archive_file(file_id=file_id)
+            if is_archived:
+                return JsonResponse({"error": "Error archiving file"}, status=400)
+            return JsonResponse({"message": "File archived successfully"}, status=200)
+
+        elif action == '4':  # Unarchive
+            is_unarchived = unarchive_file(file_id=file_id)
+            if is_unarchived:
+                return JsonResponse({"error": "Error unarchiving file"}, status=400)
+            return JsonResponse({"message": "File unarchived successfully"}, status=200)
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
 
 
 
