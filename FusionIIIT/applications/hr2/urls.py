@@ -116,6 +116,9 @@ urlpatterns = [
     url(r'api/get_cpda_adv_archive', views.get_cpda_adv_archive, name='get_cpda_adv_archive'),
     url(r'api/submit_cpda_adv_form/', views.submit_cpda_adv_form, name='submit_cpda_adv_form'), #change 29th oct 2024
     url(r'api/view_cpda_adv_form_data/(?P<id>\d+)/$', views.view_cpda_adv_form_data, name='view_cpda_adv_form_data'), #change 1st nov 2024
+    url(r'api/cpda_adv_edit_handle/(?P<id>\d+)/$', views.cpda_adv_edit_handle, name='cpda_adv_edit_handle'), 
+    url(r'api/cpda_adv_file_handle/(?P<id>\d+)/$', views.cpda_adv_file_handle, name='cpda_adv_file_handle'),
+
 
 
     url(r'api/get_cpda_claim_requests', views.get_cpda_claim_requests, name='get_cpda_claim_requests'),
