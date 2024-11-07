@@ -106,8 +106,8 @@ urlpatterns = [
     url(r'api/get_ltc_requests', views.get_ltc_requests, name='get_ltc_requests'),
     url(r'api/get_ltc_inbox', views.get_ltc_inbox, name='get_ltc_inbox'),
     url(r'api/get_ltc_archive', views.get_ltc_archive, name='get_ltc_archive'),
-    #url(r'api/get_ltc_inbox_track/(?P<id>\d+)/$', views.track_file_react,name='leaveForm'),
     url(r'api/submit_ltc_form', views.submit_ltc_form, name='submit_ltc_form'),
+
 
 
     url(r'api/get_cpda_adv_requests', views.get_cpda_adv_requests, name='get_cpda_adv_requests'),
@@ -123,6 +123,13 @@ urlpatterns = [
     url(r'api/get_cpda_claim_requests', views.get_cpda_claim_requests, name='get_cpda_claim_requests'),
     url(r'api/get_cpda_claim_inbox', views.get_cpda_claim_inbox, name='get_cpda_claim_inbox'),
     url(r'api/get_cpda_claim_archive', views.get_cpda_claim_archive, name='get_cpda_claim_archive'),
+    url(r'api/submit_cpda_claim_form/', views.submit_cpda_claim_form, name='submit_cpda_claim_form'), 
+    url(r'api/view_cpda_claim_form_data/(?P<id>\d+)/$', views.view_cpda_claim_form_data, name='view_cpda_claim_form_data'), 
+    url(r'api/cpda_claim_edit_handle/(?P<id>\d+)/$', views.cpda_claim_edit_handle, name='cpda_claim_edit_handle'), 
+    url(r'api/cpda_claim_file_handle/(?P<id>\d+)/$', views.cpda_claim_file_handle, name='cpda_claim_file_handle'),
+
+
+
 
     url(r'api/get_appraisal_requests', views.get_appraisal_requests, name='get_appraisal_requests'),
     url(r'api/get_appraisal_inbox', views.get_appraisal_inbox, name='get_appraisal_inbox'),

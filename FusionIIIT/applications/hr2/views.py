@@ -3493,7 +3493,9 @@ def submit_cpda_adv_form(request):
             return JsonResponse({'error': 'Invalid JSON data'}, status=400)
     else:
         return JsonResponse({'error': 'Unauthorized access'}, status=403)
- # cpda advance Inbox
+    
+ 
+# cpda advance Inbox
 
 from django.http import JsonResponse, Http404
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
@@ -3959,6 +3961,500 @@ def get_cpda_claim_archive(request):
         return JsonResponse({'cpda_claim_archive': filtered_archived_files})
 
     return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+
+# @api_view(['POST'])
+# @authentication_classes([TokenAuthentication])
+# @permission_classes([IsAuthenticated])
+# def submit_cpda_claim_form(request):
+#     print("apple")
+#     """POST request to submit a CPDA Claim Form. This endpoint is accessible only to authenticated users."""
+#     user = request.user
+#     try:
+#         user_id = ExtraInfo.objects.get(user=user).user_id
+#     except ExtraInfo.DoesNotExist:
+#         return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+#     employee = get_object_or_404(ExtraInfo, user__id=user_id)
+
+#     if employee.user_type in ['faculty', 'staff', 'student']:
+#         try:
+#             form_data = json.loads(request.body.decode('utf-8'))
+#             form_data['employeeId'] = user_id
+
+#             # Ensure all decimal fields are correctly formatted
+#             decimal_fields = ['advanceTaken', 'amountCheckedInPDA', 'balanceAvailable', 'advanceAmountPDA']
+#             for field in decimal_fields:
+#                 if field in form_data and form_data[field] not in [None, '']:
+#                     try:
+#                         form_data[field] = Decimal(form_data[field])
+#                     except InvalidOperation:
+#                         return JsonResponse({'error': f'Invalid decimal value for {field}'}, status=400)
+
+#             # Get the designation of the uploader
+#             holds_designation = HoldsDesignation.objects.filter(user=employee.user)
+#             if not holds_designation.exists():
+#                 return JsonResponse({'error': "Uploader does not hold any designation"}, status=404)
+
+#             holds_designation_list = list(holds_designation)
+#             form_data['designation'] = str(holds_designation_list[0].designation)
+#             uploader_designation_obj = Designation.objects.filter(name=form_data['designation']).first()
+
+#             # Create CPDAClaimForm instance
+#             cpda_claim_form = CPDAReimbursementform.objects.create(
+#                 name=form_data.get('name'),
+#                 designation=form_data.get('designation'),
+#                 pfNo=form_data.get('pfNo'),
+#                 purpose=form_data.get('purpose'),
+#                 adjustmentSubmitted=form_data.get('adjustmentSubmitted'),
+#                 submissionDate=form_data.get('submissionDate'),
+#                 advanceTaken=form_data.get('advanceTaken'),
+#                 amountCheckedInPDA=form_data.get('amountCheckedInPDA'),
+#                 balanceAvailable=form_data.get('balanceAvailable'),
+#                 advanceAmountPDA=form_data.get('advanceAmountPDA'),
+#                 created_by=user
+#             )
+
+#             print(cpda_claim_form)
+
+#             receiver_username = request.GET.get('username_reciever')
+#             employee_receiver = get_object_or_404(User, username=receiver_username)
+#             holds_designation = HoldsDesignation.objects.filter(user=employee_receiver).first()
+#             receiver_designation = str(holds_designation.designation) if holds_designation else None
+
+#             if not receiver_designation:
+#                 return JsonResponse({'error': "Receiver designation does not exist"}, status=404)
+
+#             if not uploader_designation_obj:
+#                 return JsonResponse({'error': "Uploader designation does not exist"}, status=404)
+
+#             src_module = "HR"
+#             src_object_id = str(cpda_claim_form.id)
+#             # print(src_object_id)
+#             file_extra_JSON = {"type": "CPDAClaim"}
+#             file_id = create_file(
+#                 uploader=employee.user,
+#                 uploader_designation=uploader_designation_obj,
+#                 receiver=receiver_username,
+#                 receiver_designation=receiver_designation,
+#                 src_module=src_module,
+#                 src_object_id=src_object_id,
+#                 file_extra_JSON=file_extra_JSON,
+#                 attached_file=None
+#             )
+#             messages.success(request, "CPDA claim form filled successfully")
+#             return HttpResponse("Success")
+#         except json.JSONDecodeError:
+#             return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+#     else:
+#         return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+
+
+
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def submit_cpda_claim_form(request):
+    print("Function submit_cpda_claim_form called")
+    user = request.user
+
+    # Print the incoming data
+    print("Request body:", request.body.decode('utf-8'))
+
+    try:
+        form_data = json.loads(request.body.decode('utf-8'))
+    except json.JSONDecodeError:
+        print("Invalid JSON data")
+        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+
+    print("Parsed form data:", form_data)
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        print("User ID does not exist")
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+    employee = get_object_or_404(ExtraInfo, user__id=user_id)
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        try:
+            form_data['employeeId'] = user_id
+            print("Form Data with Employee ID:", form_data)
+
+            # Ensure all decimal fields are correctly formatted
+            decimal_fields = ['advanceTaken', 'amountCheckedInPDA', 'balanceAvailable', 'advanceAmountPDA']
+            for field in decimal_fields:
+                if field in form_data and form_data[field] not in [None, '']:
+                    try:
+                        form_data[field] = Decimal(form_data[field])
+                    except InvalidOperation:
+                        print(f"Invalid decimal value for {field}")
+                        return JsonResponse({'error': f'Invalid decimal value for {field}'}, status=400)
+
+            # Get the designation of the uploader
+            holds_designation = HoldsDesignation.objects.filter(user=employee.user)
+            if not holds_designation.exists():
+                print("Uploader does not hold any designation")
+                return JsonResponse({'error': "Uploader does not hold any designation"}, status=404)
+
+            holds_designation_list = list(holds_designation)
+            form_data['designation'] = str(holds_designation_list[0].designation)
+            uploader_designation_obj = Designation.objects.filter(name=form_data['designation']).first()
+            print("Uploader Designation:", form_data['designation'])
+
+            # Create CPDAReimbursementform instance
+            cpda_claim_form = CPDAReimbursementform.objects.create(
+                employeeId=form_data.get('employeeId'),
+                name=form_data.get('name'),
+                designation=form_data.get('designation'),
+                pfNo=form_data.get('pfNo'),
+                purpose=form_data.get('purpose'),
+                adjustmentSubmitted=form_data.get('adjustmentSubmitted'),
+                submissionDate=form_data.get('submissionDate'),
+                advanceTaken=form_data.get('advanceTaken'),
+                amountCheckedInPDA=form_data.get('amountCheckedInPDA'),
+                balanceAvailable=form_data.get('balanceAvailable'),
+                advanceAmountPDA=form_data.get('advanceAmountPDA'),
+                created_by=user
+            )
+            print("CPDA Claim Form Created:", cpda_claim_form)
+
+            receiver_username = request.GET.get('username_reciever')
+            employee_receiver = get_object_or_404(User, username=receiver_username)
+            holds_designation = HoldsDesignation.objects.filter(user=employee_receiver).first()
+            receiver_designation = str(holds_designation.designation) if holds_designation else None
+
+            if not receiver_designation:
+                print("Receiver designation does not exist")
+                return JsonResponse({'error': "Receiver designation does not exist"}, status=404)
+
+            if not uploader_designation_obj:
+                print("Uploader designation does not exist")
+                return JsonResponse({'error': "Uploader designation does not exist"}, status=404)
+
+            src_module = "HR"
+            src_object_id = str(cpda_claim_form.id)
+            file_extra_JSON = {"type": "CPDAClaim"}
+            file_id = create_file(
+                uploader=employee.user,
+                uploader_designation=uploader_designation_obj,
+                receiver=receiver_username,
+                receiver_designation=receiver_designation,
+                src_module=src_module,
+                src_object_id=src_object_id,
+                file_extra_JSON=file_extra_JSON,
+                attached_file=None
+            )
+            messages.success(request, "CPDA claim form filled successfully")
+            print("Everything fine")
+            return HttpResponse("Success")
+        except Exception as e:
+            print("An error occurred:", str(e))
+            return JsonResponse({'error': 'An error occurred: ' + str(e)}, status=400)
+    else:
+        return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+
+
+
+
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def view_cpda_claim_form_data(request, id):
+    user = request.user
+
+    # Check if the user is the one who filled the form or the receiver
+    try:
+        cpda_claim_form = CPDAReimbursementform.objects.get(id=id)
+    except CPDAReimbursementform.DoesNotExist:
+        return JsonResponse({'error': 'CPDA Claim Form not found'}, status=404)
+
+    associated_file = get_object_or_404(File, src_object_id=id, src_module='HR')
+
+    # Ensure the user is either the creator or the receiver
+    try:
+        filled_by_user = cpda_claim_form.created_by
+        try:
+            tracking = Tracking.objects.get(file_id=associated_file)
+        except Tracking.MultipleObjectsReturned:
+            tracking = Tracking.objects.filter(file_id=associated_file).first()
+        receiver = tracking.receiver_id
+    except (User.DoesNotExist, Tracking.DoesNotExist):
+        return JsonResponse({'error': 'User or Tracking information not found'}, status=404)
+
+    if user != filled_by_user and user != receiver:
+        return JsonResponse({'error': 'You do not have permission to view this form'}, status=403)
+
+    # Convert the form data to JSON
+    form_data = {
+        'id': cpda_claim_form.id,
+        'name': cpda_claim_form.name,
+        'designation': cpda_claim_form.designation,
+        'pfNo': cpda_claim_form.pfNo,
+        'purpose': cpda_claim_form.purpose,
+        'adjustmentSubmitted': str(cpda_claim_form.adjustmentSubmitted),
+        'submissionDate': cpda_claim_form.submissionDate.strftime("%Y-%m-%d") if cpda_claim_form.submissionDate else None,
+        'advanceTaken': str(cpda_claim_form.advanceTaken),
+        'amountCheckedInPDA': str(cpda_claim_form.amountCheckedInPDA),
+        'balanceAvailable': str(cpda_claim_form.balanceAvailable),
+        'advanceAmountPDA': str(cpda_claim_form.advanceAmountPDA),
+        'created_by': cpda_claim_form.created_by.username,
+        'file_id': associated_file.id
+    }
+
+    return JsonResponse(form_data)
+
+
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def cpda_claim_edit_handle(request, id):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+    employee = get_object_or_404(ExtraInfo, user__id=user_id)
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        # Check if request body is empty
+        if not request.body:
+            return JsonResponse({'error': 'Request body is empty.'}, status=400)
+
+        try:
+            form_data = json.loads(request.body.decode('utf-8'))
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON format.'}, status=400)
+
+        file_id = id 
+        form_id = form_data.get('form_id') 
+
+        # edit CPDA Claim form
+        try:
+            cpda_claim_form = CPDAReimbursementform.objects.get(id=form_id)
+        except CPDAReimbursementform.DoesNotExist:
+            return JsonResponse({"error": "CPDAReimbursementform object with the provided ID does not exist"}, status=404)
+        
+        # edit everything except name and designation
+        cpda_claim_form.submissionDate = form_data.get('submissionDate', cpda_claim_form.submissionDate)
+        cpda_claim_form.pfNo = form_data.get('pfNo', cpda_claim_form.pfNo)
+        cpda_claim_form.purpose = form_data.get('purpose', cpda_claim_form.purpose)
+        cpda_claim_form.adjustmentSubmitted = form_data.get('adjustmentSubmitted', cpda_claim_form.adjustmentSubmitted)
+        cpda_claim_form.balanceAvailable = form_data.get('balanceAvailable', cpda_claim_form.balanceAvailable)
+        cpda_claim_form.advanceAmountPDA = form_data.get('advanceAmountPDA', cpda_claim_form.advanceAmountPDA)
+        cpda_claim_form.amountCheckedInPDA = form_data.get('amountCheckedInPDA', cpda_claim_form.amountCheckedInPDA)
+        cpda_claim_form.advanceTaken = form_data.get('advanceTaken', cpda_claim_form.advanceTaken)
+        cpda_claim_form.save()
+
+        try:
+            cpda_claim_form = CPDAReimbursementform.objects.get(id=form_id)
+        except CPDAReimbursementform.DoesNotExist:
+            return JsonResponse({"error": "CPDAReimbursementform object with the provided ID does not exist"}, status=404)
+
+        from_user = employee.user.username
+        action = form_data.get('action') 
+
+        # Get the designation of the uploader
+        holds_designation = HoldsDesignation.objects.filter(user=employee.user)
+        if not holds_designation.exists():
+            return JsonResponse({'error': "Uploader does not hold any designation"}, status=404)
+
+        from_designation = str(holds_designation[0].designation)
+
+        # Receiver details
+        receiver = form_data.get('username_receiver') 
+        receiver_designation = form_data.get('designation_receiver') 
+        remark = form_data.get('remark', '')
+
+        try:
+            cpda_claim_form = CPDAReimbursementform.objects.get(id=form_id)
+        except CPDAReimbursementform.DoesNotExist:
+            return JsonResponse({"error": "CPDAReimbursementform object with the provided ID does not exist"}, status=404)
+        
+        current_owner = get_current_file_owner(file_id)
+
+        if action == '0':  # Forward
+            remarks = f"Edited & Forwarded by {current_owner} to {receiver}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=receiver,
+                receiver_designation=receiver_designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            return JsonResponse({"message": "File forwarded successfully"}, status=200)
+
+        elif action == '1':  # Reject
+            remarks = f"Edited & Rejected by {current_owner}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=cpda_claim_form.name,
+                receiver_designation=cpda_claim_form.designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            return JsonResponse({"message": "File rejected successfully"}, status=200)
+
+        elif action == '2':  # Approve
+            remarks = f"Edited & Approved by {current_owner}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=cpda_claim_form.name,
+                receiver_designation=cpda_claim_form.designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            cpda_claim_form.approved = True
+            cpda_claim_form.approvedDate = timezone.now()
+            cpda_claim_form.approved_by = current_owner
+            cpda_claim_form.save()
+            return JsonResponse({"message": "File approved successfully"}, status=200)
+
+        elif action == '3':  # Archive
+            is_archived = archive_file(file_id=file_id)
+            if is_archived:
+                return JsonResponse({"error": "Error archiving file"}, status=400)
+            return JsonResponse({"message": "File archived successfully"}, status=200)
+
+        elif action == '4':  # Unarchive
+            is_unarchived = unarchive_file(file_id=file_id)
+            if is_unarchived:
+                return JsonResponse({"error": "Error unarchiving file"}, status=400)
+            return JsonResponse({"message": "File unarchived successfully"}, status=200)
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+
+
+
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def cpda_claim_file_handle(request, id):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+    employee = get_object_or_404(ExtraInfo, user__id=user_id)
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        # Check if request body is empty
+        if not request.body:
+            return JsonResponse({'error': 'Request body is empty.'}, status=400)
+
+        try:
+            form_data = json.loads(request.body.decode('utf-8'))
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON format.'}, status=400)
+
+        file_id = id
+        form_id = form_data.get('form_id')
+
+        from_user = employee.user.username
+        action = form_data.get('action')
+
+        # Get the designation of the uploader
+        holds_designation = HoldsDesignation.objects.filter(user=employee.user)
+        if not holds_designation.exists():
+            return JsonResponse({'error': "Uploader does not hold any designation"}, status=404)
+
+        from_designation = str(holds_designation[0].designation)
+
+        # Receiver details
+        receiver = form_data.get('username_receiver')
+        receiver_designation = form_data.get('designation_receiver')
+        remark = form_data.get('remark', '')
+
+        try:
+            cpda_claim_form = CPDAReimbursementform.objects.get(id=form_id)
+        except CPDAReimbursementform.DoesNotExist:
+            return JsonResponse({"error": "CPDAReimbursementform object with the provided ID does not exist"}, status=404)
+        
+        current_owner = get_current_file_owner(file_id)
+
+        if action == '0':  # Forward
+            remarks = f"Forwarded by {current_owner} to {receiver}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=receiver,
+                receiver_designation=receiver_designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            return JsonResponse({"message": "File forwarded successfully"}, status=200)
+
+        elif action == '1':  # Reject
+            remarks = f"Rejected by {current_owner}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=cpda_claim_form.name,
+                receiver_designation=cpda_claim_form.designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            return JsonResponse({"message": "File rejected successfully"}, status=200)
+
+        elif action == '2':  # Approve
+            remarks = f"Approved by {current_owner}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=cpda_claim_form.name,
+                receiver_designation=cpda_claim_form.designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            cpda_claim_form.approved = True
+            cpda_claim_form.approvedDate = timezone.now()
+            cpda_claim_form.approved_by = current_owner
+            cpda_claim_form.save()
+            return JsonResponse({"message": "File approved successfully"}, status=200)
+
+        elif action == '3':  # Archive
+            is_archived = archive_file(file_id=file_id)
+            if is_archived:
+                return JsonResponse({"message": "File archived successfully"}, status=200)
+            return JsonResponse({"error": "Error archiving file"}, status=400)    
+
+        elif action == '4':  # Unarchive
+            is_unarchived = unarchive_file(file_id=file_id)
+            if is_unarchived:
+                return JsonResponse({"message": "File unarchived successfully"}, status=200)
+            return JsonResponse({"error": "Error unarchiving file"}, status=400)    
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+
+
+
+
+
 
 
 # Appraisal Routes function--------------------------------------
