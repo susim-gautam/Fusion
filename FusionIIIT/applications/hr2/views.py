@@ -3170,6 +3170,104 @@ def track_file_react(request, id):
 
 # ltc Routes function--------------------------------------
 
+#submit ltc form
+
+@csrf_exempt
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def submit_ltc_form(request):
+    user = request.user
+    if user.is_anonymous:
+        return JsonResponse({'error': 'Authentication credentials were not provided.'}, status=401)
+
+    # Step 1: Fetch user ID from ExtraInfo
+    try:
+        employee = ExtraInfo.objects.get(user=user)
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User information not found in ExtraInfo.'}, status=400)
+
+    # Step 2: Check if the user type is allowed to submit LTC forms
+    if employee.user_type not in ['faculty', 'staff', 'student']:
+        return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+    try:
+        form_data = json.loads(request.body.decode('utf-8'))
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+
+    # Step 3: Verify required fields
+    required_fields = [
+        "name", "pfNo", "blockYear", "basicPaySalary", "designation", 
+        "departmentInfo", "leaveStartDate", "leaveEndDate", "phoneNumberForContact"
+    ]
+    
+    for field in required_fields:
+        if field not in form_data or form_data[field] in [None, "", {}]:
+            return JsonResponse({'error': f"{field} is required."}, status=400)
+
+    try:
+        # Step 4: Extract and validate form data
+        form_data['employeeId'] = employee.user_id
+        holds_designation = HoldsDesignation.objects.filter(user=employee.user)
+        if not holds_designation.exists():
+            return JsonResponse({'error': "Uploader does not hold any designation"}, status=404)
+        
+        # Use the first designation as default
+        form_data['designation'] = str(holds_designation.first().designation)
+
+        # Step 5: Create the LTC form entry in the database
+        ltc_form = LTCform.objects.create(
+            employeeId=form_data['employeeId'],
+            name=form_data['name'],
+            pfNo=int(form_data['pfNo']),
+            blockYear=int(form_data['blockYear']),
+            basicPaySalary=int(form_data['basicPaySalary']),
+            designation=form_data['designation'],
+            departmentInfo=form_data['departmentInfo'],
+            leaveStartDate=form_data['leaveStartDate'],
+            leaveEndDate=form_data['leaveEndDate'],
+            dateOfDepartureForFamily=form_data.get('dateOfDepartureForFamily'),
+            natureOfLeave=form_data.get('natureOfLeave', ""),
+            purposeOfLeave=form_data.get('purposeOfLeave', ""),
+            placeOfVisit=form_data.get('placeOfVisit', ""),
+            addressDuringLeave=form_data.get('addressDuringLeave', ""),
+            modeofTravel=form_data.get('modeOfTravel', ""),
+            amountOfAdvanceRequired=int(form_data.get('amountOfAdvanceRequired', 0)),
+            certifiedThatAdvanceTakenOn=form_data.get('certifiedThatAdvanceTakenOn', False),
+            submissionDate=form_data.get('submissionDate', ""),
+            phoneNumberForContact=form_data['phoneNumberForContact'],
+            detailsOfFamilyMembersAboutToAvail=form_data.get('detailsOfFamilyMembersAboutToAvail', {}),
+            detailsOfDependents=form_data.get('detailsOfDependents', {}),
+            created_by=user
+        )
+
+        # Step 6: File creation logic
+        uploader = employee.user
+        receiver = form_data.get('username_reciever', "")
+        receiver_designation = form_data.get('designation_reciever', "")
+        file_id = create_file(
+            uploader=uploader,
+            uploader_designation=form_data['designation'],
+            receiver=receiver,
+            receiver_designation=receiver_designation,
+            src_module="HR",
+            src_object_id=str(ltc_form.id),
+            file_extra_JSON={"type": "LTC"},
+            attached_file=None
+        )
+
+        return JsonResponse({'message': 'LTC form submitted successfully!'}, status=201)
+
+    except Exception as e:
+        # Handle any other errors gracefully
+        return JsonResponse({'error': f"An unexpected error occurred: {str(e)}"}, status=400)
+        
+
+    
+
+
+
 #ltc requests
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])

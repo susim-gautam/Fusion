@@ -106,9 +106,8 @@ urlpatterns = [
     url(r'api/get_ltc_requests', views.get_ltc_requests, name='get_ltc_requests'),
     url(r'api/get_ltc_inbox', views.get_ltc_inbox, name='get_ltc_inbox'),
     url(r'api/get_ltc_archive', views.get_ltc_archive, name='get_ltc_archive'),
-    # url(r'api/get_ltc_inbox_track/(?P<id>\d+)/$', views.track_file_react,name='leaveForm'),
-    
-    
+    url(r'api/submit_ltc_form', views.submit_ltc_form, name='submit_ltc_form'),
+
 
 
     url(r'api/get_cpda_adv_requests', views.get_cpda_adv_requests, name='get_cpda_adv_requests'),
