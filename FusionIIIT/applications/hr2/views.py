@@ -3264,9 +3264,359 @@ def submit_ltc_form(request):
         return JsonResponse({'error': f"An unexpected error occurred: {str(e)}"}, status=400)
         
 
+#view ltc form data (corrected)
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def view_ltc_form_data(request, id):
+    """Retrieve LTC form data for authenticated users with access permissions."""
+
+    user = request.user
+
+    # Check if the user is the one who filled the form or the receiver
+    try:
+        ltc_form = LTCform.objects.get(id=id)
+    except LTCform.DoesNotExist:
+        return JsonResponse({'error': 'Leave Form not found'}, status=404)
+
+    associated_files = File.objects.filter(src_object_id=id, src_module='HR')
+
+    if not associated_files.exists():
+        return JsonResponse({'error': 'Associated file not found'}, status=404)
+
+    # Ensure the user is either the creator or the receiver
+    try:
+        filled_by_user = ltc_form.created_by
+        tracking_entries = Tracking.objects.filter(file_id__in=associated_files).order_by('receive_date')
+
+        if not tracking_entries.exists():
+            return JsonResponse({'error': 'Tracking information not found'}, status=404)
+
+        receiver = tracking_entries.latest('receive_date').receiver_id  # Get the latest tracking entry by receive_date
+    except (User.DoesNotExist, Tracking.DoesNotExist):
+        return JsonResponse({'error': 'User or Tracking information not found'}, status=404)
+
+    if user != filled_by_user and user != receiver:
+        return JsonResponse({'error': 'You do not have permission to view this form'}, status=403)
+
+    # Get the first associated file for consistency
+    associated_file = associated_files.first()
+
+    # Prepare form data as JSON response
+    form_data = {
+        'id': ltc_form.id,
+        'employeeId': ltc_form.employeeId,
+        'name': ltc_form.name,
+        'blockYear': ltc_form.blockYear,
+        'pfNo': ltc_form.pfNo,
+        'basicPaySalary': str(ltc_form.basicPaySalary),
+        'designation': ltc_form.designation,
+        'departmentInfo': ltc_form.departmentInfo,
+        'leaveRequired': ltc_form.leaveRequired,
+        'leaveStartDate': ltc_form.leaveStartDate.strftime("%Y-%m-%d") if ltc_form.leaveStartDate else None,
+        'leaveEndDate': ltc_form.leaveEndDate.strftime("%Y-%m-%d") if ltc_form.leaveEndDate else None,
+        'dateOfDepartureForFamily': ltc_form.dateOfDepartureForFamily.strftime("%Y-%m-%d") if ltc_form.dateOfDepartureForFamily else None,
+        'natureOfLeave': ltc_form.natureOfLeave,
+        'purposeOfLeave': ltc_form.purposeOfLeave,
+        'hometownOrNot': ltc_form.hometownOrNot,
+        'placeOfVisit': ltc_form.placeOfVisit,
+        'addressDuringLeave': ltc_form.addressDuringLeave,
+        'modeofTravel': ltc_form.modeofTravel,
+        'detailsOfFamilyMembersAlreadyDone': ltc_form.detailsOfFamilyMembersAlreadyDone,
+        'detailsOfFamilyMembersAboutToAvail': ltc_form.detailsOfFamilyMembersAboutToAvail,
+        'detailsOfDependents': ltc_form.detailsOfDependents,
+        'amountOfAdvanceRequired': str(ltc_form.amountOfAdvanceRequired),
+        'certifiedThatFamilyDependents': ltc_form.certifiedThatFamilyDependents,
+        'certifiedThatAdvanceTakenOn': ltc_form.certifiedThatAdvanceTakenOn.strftime("%Y-%m-%d") if ltc_form.certifiedThatAdvanceTakenOn else None,
+        'adjustedMonth': ltc_form.adjustedMonth,
+        'submissionDate': ltc_form.submissionDate.strftime("%Y-%m-%d") if ltc_form.submissionDate else None,
+        'phoneNumberForContact': ltc_form.phoneNumberForContact,
+        'approved': ltc_form.approved,
+        'approvedDate': ltc_form.approvedDate.strftime("%Y-%m-%d") if ltc_form.approvedDate else None,
+        'created_by': ltc_form.created_by.username,
+        'file_id': associated_file.id
+    }
+
+    # Get file id
+    file_id = associated_file.id
+    form_data['file_id'] = file_id
+
+    return JsonResponse(form_data)
+
+#ltc file handle
+
+''' 
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+
+def ltc_file_handle(request, id):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+    employee = get_object_or_404(ExtraInfo, user__id=user_id)
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        # Check if request body is empty
+        if not request.body:
+            return JsonResponse({'error': 'Request body is empty.'}, status=400)
+
+        try:
+            form_data = json.loads(request.body.decode('utf-8'))
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON format.'}, status=400)
+
+        # # print form_data
+        # print(form_data)
+
     
 
+        file_id = id 
+        form_id = form_data.get('form_id') 
 
+        from_user = employee.user.username
+        action = form_data.get('action') 
+
+        # Get the designation of the uploader
+        holds_designation = HoldsDesignation.objects.filter(user=employee.user)
+        if not holds_designation.exists():
+            return JsonResponse({'error': "Uploader does not hold any designation"}, status=404)
+
+        from_designation = str(holds_designation[0].designation)
+
+        # Receiver details
+        receiver = form_data.get('username_receiver') 
+        receiver_designation = form_data.get('designation_receiver') 
+        remark = form_data.get('remark', '')
+
+        try:
+            ltc_form = LTCform.objects.get(id=form_id)
+        except LTCform.DoesNotExist:
+            return JsonResponse({"error": "LTCform object with the provided ID does not exist"}, status=404)
+        
+        current_owner = get_current_file_owner(file_id)
+
+        if action == '0':  # Forward
+            remarks = f"Forwarded by {current_owner} to {receiver}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=receiver,
+                receiver_designation=receiver_designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            return JsonResponse({"message": "File forwarded successfully"}, status=200)
+
+        elif action == '1':  # Reject
+            remarks = f"Rejected by {current_owner}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=ltc_form.name,
+                receiver_designation=ltc_form.designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            return JsonResponse({"message": "File rejected successfully"}, status=200)
+
+        elif action == '2':  # Approve
+            remarks = f"Approved by {current_owner}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=ltc_form.name,
+                receiver_designation=ltc_form.designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            ltc_form.approved = True
+            ltc_form.approvedDate = timezone.now()
+            ltc_form.approved_by = current_owner
+            ltc_form.save()
+            return JsonResponse({"message": "File approved successfully"}, status=200)
+
+        elif action == '3':  # Archive
+            is_archived = archive_file(file_id=file_id)
+            if (is_archived):
+                return JsonResponse({"message": "File archived successfully"}, status=200)
+            return JsonResponse({"error": "Error archiving file"}, status=400)    
+            
+
+        elif action == '4':  # Unarchive
+            is_unarchived = unarchive_file(file_id=file_id)
+            if is_unarchived:
+                return JsonResponse({"message": "File unarchived successfully"}, status=200)
+            return JsonResponse({"error": "Error unarchiving file"}, status=400)    
+            
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+'''
+
+# edit ltc form data 
+
+'''
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+
+def ltc_edit_handle(request, id):
+    user = request.user
+
+    try:
+        user_id = ExtraInfo.objects.get(user=user).user_id
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User ID is required.'}, status=400)
+
+    employee = get_object_or_404(ExtraInfo, user__id=user_id)
+
+    if employee.user_type in ['faculty', 'staff', 'student']:
+        # Check if request body is empty
+        if not request.body:
+            return JsonResponse({'error': 'Request body is empty.'}, status=400)
+
+        try:
+            form_data = json.loads(request.body.decode('utf-8'))
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON format.'}, status=400)
+
+        # # print form_data
+        # print(form_data)
+
+    
+
+        file_id = id 
+        form_id = form_data.get('form_id') 
+
+        # edit ltc form
+        try:
+            ltc_form = LTCform.objects.get(id=form_id)
+        except LTCform.DoesNotExist:
+            return JsonResponse({"error": "LTCform object with the provided ID does not exist"}, status=404)
+        
+
+        ltc_form.pfNo = form_data.get('pfNo', ltc_form.pfNo)
+        ltc_form.blockYear = int(form_data.get('blockYear', ltc_form.blockYear))
+        ltc_form.basicPaySalary = int(form_data.get('basicPaySalary', ltc_form.basicPaySalary))
+        ltc_form.departmentInfo = form_data.get('departmentInfo', ltc_form.departmentInfo)
+        ltc_form.leaveStartDate = form_data.get('leaveStartDate', ltc_form.leaveStartDate)
+        ltc_form.leaveEndDate = form_data.get('leaveEndDate', ltc_form.leaveEndDate)
+        ltc_form.dateOfDepartureForFamily = form_data.get('dateOfDepartureForFamily', ltc_form.dateOfDepartureForFamily)
+        ltc_form.natureOfLeave = form_data.get('natureOfLeave', ltc_form.natureOfLeave)
+        ltc_form.purposeOfLeave = form_data.get('purposeOfLeave', ltc_form.purposeOfLeave)
+        ltc_form.placeOfVisit = form_data.get('placeOfVisit', ltc_form.placeOfVisit)
+        ltc_form.addressDuringLeave = form_data.get('addressDuringLeave', ltc_form.addressDuringLeave)
+        ltc_form.modeofTravel = form_data.get('modeOfTravel', ltc_form.modeofTravel)
+        ltc_form.amountOfAdvanceRequired = int(form_data.get('amountOfAdvanceRequired', ltc_form.amountOfAdvanceRequired))
+        ltc_form.certifiedThatAdvanceTakenOn = form_data.get('certifiedThatAdvanceTakenOn', ltc_form.certifiedThatAdvanceTakenOn)
+        ltc_form.submissionDate = form_data.get('submissionDate', ltc_form.submissionDate)
+        ltc_form.phoneNumberForContact = form_data.get('phoneNumberForContact', ltc_form.phoneNumberForContact)
+        ltc_form.detailsOfFamilyMembersAboutToAvail = form_data.get('detailsOfFamilyMembersAboutToAvail', ltc_form.detailsOfFamilyMembersAboutToAvail)
+        ltc_form.detailsOfDependents = form_data.get('detailsOfDependents', ltc_form.detailsOfDependents)
+        ltc_form.save()
+
+        try:
+            ltc_form = LTCform.objects.get(id=form_id)
+        except LTCform.DoesNotExist:
+            return JsonResponse({"error": "LTCform object with the provided ID does not exist"}, status=404)
+
+
+
+
+
+
+        from_user = employee.user.username
+        action = form_data.get('action') 
+
+        # Get the designation of the uploader
+        holds_designation = HoldsDesignation.objects.filter(user=employee.user)
+        if not holds_designation.exists():
+            return JsonResponse({'error': "Uploader does not hold any designation"}, status=404)
+
+        from_designation = str(holds_designation[0].designation)
+
+        # Receiver details
+        receiver = form_data.get('username_receiver') 
+        receiver_designation = form_data.get('designation_receiver') 
+        remark = form_data.get('remark', '')
+
+        try:
+            ltc_form = LTCform.objects.get(id=form_id)
+        except LTCform.DoesNotExist:
+            return JsonResponse({"error": "LTCform object with the provided ID does not exist"}, status=404)
+
+        
+        current_owner = get_current_file_owner(file_id)
+
+        if action == '0':  # Forward
+            remarks = f"Edited & Forwarded by {current_owner} to {receiver}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=receiver,
+                receiver_designation=receiver_designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            return JsonResponse({"message": "File forwarded successfully"}, status=200)
+
+        elif action == '1':  # Reject
+            remarks = f"Edited & Rejected by {current_owner}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=leave_form.name,
+                receiver_designation=leave_form.designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            return JsonResponse({"message": "File rejected successfully"}, status=200)
+
+        elif action == '2':  # Approve
+            remarks = f"Edited & Approved by {current_owner}"
+            if remark:
+                remarks += f", Reason: {remark}"
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=leave_form.name,
+                receiver_designation=leave_form.designation,
+                remarks=remarks,
+                file_extra_JSON="None"
+            )
+            leave_form.approved = True
+            leave_form.approvedDate = timezone.now()
+            leave_form.approved_by = current_owner
+            leave_form.save()
+            return JsonResponse({"message": "File approved successfully"}, status=200)
+
+        elif action == '3':  # Archive
+            is_archived = archive_file(file_id=file_id)
+            if is_archived:
+                return JsonResponse({"error": "Error archiving file"}, status=400)
+            return JsonResponse({"message": "File archived successfully"}, status=200)
+
+        elif action == '4':  # Unarchive
+            is_unarchived = unarchive_file(file_id=file_id)
+            if is_unarchived:
+                return JsonResponse({"error": "Error unarchiving file"}, status=400)
+            return JsonResponse({"message": "File unarchived successfully"}, status=200)
+
+    return JsonResponse({'error': 'Unauthorized access'}, status=403)
+
+'''
 
 #ltc requests
 @api_view(['GET'])
