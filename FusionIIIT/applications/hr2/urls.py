@@ -75,24 +75,62 @@ urlpatterns = [
 
 
 
+    # New routes for React api Date:28-10-2024 --------------------------------------------------------------------------------------------------
+    
+    # search employee
+    url(r'api/search_employee', views.search_employee_by_username, name='search_employee_by_username'),
+    url(r'api/get_my_details', views.get_my_details, name='get_my_details'),
+
+    url(r'api/get_leave_requests', views.get_leave_requests, name='get_leave_requests'),
+    url(r'api/get_leave_inbox', views.get_leave_inbox, name='get_leave_inbox'),
+    url(r'api/get_leave_archive', views.get_leave_archive, name='get_leave_archive'),
+    url(r'^api/submit_leave_form', views.submit_leave_form, name='submit_leave_form'),
+    url(r'api/view_leave_form_data/(?P<id>\d+)/$', views.view_leave_form_data, name='view_leave_form_data'), #change 1st nov 2024
+    url(r'api/leave_file_handle/(?P<id>\d+)/$', views.leave_file_handle, name='leave_file_handle'),
+    url(r'api/get_form_id/(?P<id>\d+)/$', views.get_form_id, name='get_form_id'),
+    url(r'api/leave_edit_handle/(?P<id>\d+)/$', views.leave_edit_handle, name='leave_edit_handle'),
+    
+    
+
+
+    #url for tracking the files of all workflow
+    url(r'api/get_track_file/(?P<id>\d+)/$', views.track_file_react, name='track_file_react'),
+    
+
+    url(r'api/get_ltc_requests', views.get_ltc_requests, name='get_ltc_requests'),
+    url(r'api/get_ltc_inbox', views.get_ltc_inbox, name='get_ltc_inbox'),
+    url(r'api/get_ltc_archive', views.get_ltc_archive, name='get_ltc_archive'),
+    url(r'api/submit_ltc_form', views.submit_ltc_form, name='submit_ltc_form'),
+    url(r'api/view_ltc_form_data/(?P<id>\d+)/$', views.view_ltc_form_data, name='view_ltc_form_data'),
+    #url(r'api/ltc_file_handle/(?P<id>\d+)/$', views.ltc_file_handle, name='ltc_file_handle'),
+    #url(r'api/ltc_edit_handle/(?P<id>\d+)/$', views.ltc_edit_handle, name='ltc_edit_handle'),
+
+
+
+    url(r'api/get_cpda_adv_requests', views.get_cpda_adv_requests, name='get_cpda_adv_requests'),
+    url(r'api/get_cpda_adv_inbox', views.get_cpda_adv_inbox, name='get_cpda_adv_inbox'),
+    url(r'api/get_cpda_adv_archive', views.get_cpda_adv_archive, name='get_cpda_adv_archive'),
+    url(r'api/submit_cpda_adv_form/', views.submit_cpda_adv_form, name='submit_cpda_adv_form'), #change 29th oct 2024
+    url(r'api/view_cpda_adv_form_data/(?P<id>\d+)/$', views.view_cpda_adv_form_data, name='view_cpda_adv_form_data'), #change 1st nov 2024
+    url(r'api/cpda_adv_edit_handle/(?P<id>\d+)/$', views.cpda_adv_edit_handle, name='cpda_adv_edit_handle'), 
+    url(r'api/cpda_adv_file_handle/(?P<id>\d+)/$', views.cpda_adv_file_handle, name='cpda_adv_file_handle'),
+
+
+
+    url(r'api/get_cpda_claim_requests', views.get_cpda_claim_requests, name='get_cpda_claim_requests'),
+    url(r'api/get_cpda_claim_inbox', views.get_cpda_claim_inbox, name='get_cpda_claim_inbox'),
+    url(r'api/get_cpda_claim_archive', views.get_cpda_claim_archive, name='get_cpda_claim_archive'),
+    url(r'api/submit_cpda_claim_form/', views.submit_cpda_claim_form, name='submit_cpda_claim_form'), 
+    url(r'api/view_cpda_claim_form_data/(?P<id>\d+)/$', views.view_cpda_claim_form_data, name='view_cpda_claim_form_data'), 
+    url(r'api/cpda_claim_edit_handle/(?P<id>\d+)/$', views.cpda_claim_edit_handle, name='cpda_claim_edit_handle'), 
+    url(r'api/cpda_claim_file_handle/(?P<id>\d+)/$', views.cpda_claim_file_handle, name='cpda_claim_file_handle'),
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    url(r'api/get_appraisal_requests', views.get_appraisal_requests, name='get_appraisal_requests'),
+    url(r'api/get_appraisal_inbox', views.get_appraisal_inbox, name='get_appraisal_inbox'),
+    url(r'api/get_appraisal_archive', views.get_appraisal_archive, name='get_appraisal_archive'),
 
 
 
