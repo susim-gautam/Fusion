@@ -3237,6 +3237,7 @@ def submit_ltc_form(request):
             certifiedThatAdvanceTakenOn=form_data.get('certifiedThatAdvanceTakenOn', False),
             submissionDate=form_data.get('submissionDate', ""),
             phoneNumberForContact=form_data['phoneNumberForContact'],
+            detailsOfFamilyMembersAlreadyDone=form_data.get('detailsOfFamilyMembersAlreadyDone', {}),
             detailsOfFamilyMembersAboutToAvail=form_data.get('detailsOfFamilyMembersAboutToAvail', {}),
             detailsOfDependents=form_data.get('detailsOfDependents', {}),
             created_by=user
