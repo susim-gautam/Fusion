@@ -103,8 +103,8 @@ urlpatterns = [
     #url(r'api/get_ltc_inbox_track/(?P<id>\d+)/$', views.track_file_react,name='leaveForm'),
     url(r'api/submit_ltc_form', views.submit_ltc_form, name='submit_ltc_form'),
     url(r'api/view_ltc_form_data/(?P<id>\d+)/$', views.view_ltc_form_data, name='view_ltc_form_data'),
-    #url(r'api/ltc_file_handle/(?P<id>\d+)/$', views.ltc_file_handle, name='ltc_file_handle'),
-    #url(r'api/ltc_edit_handle/(?P<id>\d+)/$', views.ltc_edit_handle, name='ltc_edit_handle'),
+    url(r'api/ltc_file_handle/(?P<id>\d+)/$', views.ltc_file_handle, name='ltc_file_handle'),
+    url(r'api/ltc_edit_handle/(?P<id>\d+)/$', views.ltc_edit_handle, name='ltc_edit_handle'),
 
 
     url(r'api/get_cpda_adv_requests', views.get_cpda_adv_requests, name='get_cpda_adv_requests'),
