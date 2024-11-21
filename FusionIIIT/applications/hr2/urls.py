@@ -102,8 +102,8 @@ urlpatterns = [
     url(r'api/get_ltc_archive', views.get_ltc_archive, name='get_ltc_archive'),
     url(r'api/submit_ltc_form', views.submit_ltc_form, name='submit_ltc_form'),
     url(r'api/view_ltc_form_data/(?P<id>\d+)/$', views.view_ltc_form_data, name='view_ltc_form_data'),
-    #url(r'api/ltc_file_handle/(?P<id>\d+)/$', views.ltc_file_handle, name='ltc_file_handle'),
-    #url(r'api/ltc_edit_handle/(?P<id>\d+)/$', views.ltc_edit_handle, name='ltc_edit_handle'),
+    url(r'api/ltc_file_handle/(?P<id>\d+)/$', views.ltc_file_handle, name='ltc_file_handle'),
+    url(r'api/ltc_edit_handle/(?P<id>\d+)/$', views.ltc_edit_handle, name='ltc_edit_handle'),
 
 
 

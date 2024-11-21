@@ -3347,8 +3347,6 @@ def view_ltc_form_data(request, id):
 
 #ltc file handle
 
-''' 
-
 @api_view(['POST'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
@@ -3461,17 +3459,13 @@ def ltc_file_handle(request, id):
             
 
     return JsonResponse({'error': 'Unauthorized access'}, status=403)
-'''
 
-# edit ltc form data 
 
-'''
-
+# edit ltc form data
 
 @api_view(['POST'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
-
 def ltc_edit_handle(request, id):
     user = request.user
 
@@ -3500,7 +3494,6 @@ def ltc_edit_handle(request, id):
         file_id = id 
         form_id = form_data.get('form_id') 
 
-        # edit ltc form
         try:
             ltc_form = LTCform.objects.get(id=form_id)
         except LTCform.DoesNotExist:
@@ -3531,11 +3524,7 @@ def ltc_edit_handle(request, id):
             ltc_form = LTCform.objects.get(id=form_id)
         except LTCform.DoesNotExist:
             return JsonResponse({"error": "LTCform object with the provided ID does not exist"}, status=404)
-
-
-
-
-
+        
 
         from_user = employee.user.username
         action = form_data.get('action') 
@@ -3556,7 +3545,6 @@ def ltc_edit_handle(request, id):
             ltc_form = LTCform.objects.get(id=form_id)
         except LTCform.DoesNotExist:
             return JsonResponse({"error": "LTCform object with the provided ID does not exist"}, status=404)
-
         
         current_owner = get_current_file_owner(file_id)
 
@@ -3579,8 +3567,8 @@ def ltc_edit_handle(request, id):
                 remarks += f", Reason: {remark}"
             track_id = forward_file(
                 file_id=file_id,
-                receiver=leave_form.name,
-                receiver_designation=leave_form.designation,
+                receiver=ltc_form.name,
+                receiver_designation=ltc_form.designation,
                 remarks=remarks,
                 file_extra_JSON="None"
             )
@@ -3592,15 +3580,15 @@ def ltc_edit_handle(request, id):
                 remarks += f", Reason: {remark}"
             track_id = forward_file(
                 file_id=file_id,
-                receiver=leave_form.name,
-                receiver_designation=leave_form.designation,
+                receiver=ltc_form.name,
+                receiver_designation=ltc_form.designation,
                 remarks=remarks,
                 file_extra_JSON="None"
             )
-            leave_form.approved = True
-            leave_form.approvedDate = timezone.now()
-            leave_form.approved_by = current_owner
-            leave_form.save()
+            ltc_form.approved = True
+            ltc_form.approvedDate = timezone.now()
+            ltc_form.approved_by = current_owner
+            ltc_form.save()
             return JsonResponse({"message": "File approved successfully"}, status=200)
 
         elif action == '3':  # Archive
@@ -3617,7 +3605,7 @@ def ltc_edit_handle(request, id):
 
     return JsonResponse({'error': 'Unauthorized access'}, status=403)
 
-'''
+
 
 #ltc requests
 @api_view(['GET'])
