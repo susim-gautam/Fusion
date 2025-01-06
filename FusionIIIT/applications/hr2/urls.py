@@ -84,6 +84,7 @@ urlpatterns = [
     url(r'api/get_leave_requests', views.get_leave_requests, name='get_leave_requests'),
     url(r'api/get_leave_inbox', views.get_leave_inbox, name='get_leave_inbox'),
     url(r'api/get_leave_archive', views.get_leave_archive, name='get_leave_archive'),
+    url(r'api/get_leave_balance', views.get_leave_balance, name='get_leave_balance'),
     url(r'^api/submit_leave_form', views.submit_leave_form, name='submit_leave_form'),
     url(r'api/view_leave_form_data/(?P<id>\d+)/$', views.view_leave_form_data, name='view_leave_form_data'), #change 1st nov 2024
     url(r'api/leave_file_handle/(?P<id>\d+)/$', views.leave_file_handle, name='leave_file_handle'),

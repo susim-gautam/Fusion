@@ -3003,6 +3003,75 @@ def leave_edit_handle(request, id):
 
 
 
+
+
+
+
+# @api_view(['GET'])
+# @authentication_classes([TokenAuthentication])
+# @permission_classes([IsAuthenticated])
+# def get_leave_balance(request):
+#     print("mango is yellow")
+#     user = request.user
+#     employee_id=5332
+
+#     print(f"Requested user: {user}")
+#     print(f"Employee ID: {user}")
+
+#     try:
+#         leave_balance = LeaveBalance.objects.get(employeeId__user=user, employeeId_id=employee_id)
+#         print("Leave balance found:", leave_balance)
+#     except LeaveBalance.DoesNotExist:
+#         print("Leave balance not found")
+#         return JsonResponse({'error': 'Leave balance not found'}, status=404)
+    
+#     leave_data = {
+#         'casualLeave': leave_balance.casualLeave,
+#         'specialCasualLeave': leave_balance.specialCasualLeave,
+#         'earnedLeave': leave_balance.earnedLeave,
+#         'commutedLeave': leave_balance.commutedLeave,
+#         'restrictedHoliday': leave_balance.restrictedHoliday,
+#         'stationLeave': leave_balance.stationLeave,
+#         'vacationLeave': leave_balance.vacationLeave,
+#     }
+
+#     print("apple is red")
+#     return JsonResponse(leave_data)
+
+
+
+
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_leave_balance(request):
+    # user = request.user
+
+    # Dummy leave balance data
+    dummy_leave_data = {
+        'Casual Leave': 12,
+        'Special Casual Leave': 5,
+        'Earned Leave': 20,
+        'Commuted Leave': 15,
+        'Restricted Holiday': 2,
+        'Vacation Leave': 25,
+        'Station Leave': 10,
+    }
+
+    # Return the dummy leave balance data
+    return JsonResponse(dummy_leave_data)
+
+
+
+
+
+
+
+
+
+
+
 #leave requests
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])
