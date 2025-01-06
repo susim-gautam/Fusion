@@ -208,7 +208,8 @@ class LeaveForm(models.Model):
     submissionDate = models.DateField(blank=True, null=True)
     pfNo = models.IntegerField(null=True)
     departmentInfo = models.CharField(max_length=40,null=True)
-    natureOfLeave = models.TextField(max_length=40,null=True)
+    # natureOfLeave = models.TextField(max_length=40,null=True)
+    natureOfLeave = models.JSONField(null=True)
     leaveStartDate = models.DateField(blank=True, null=True)
     leaveEndDate = models.DateField(blank=True, null=True)
    
