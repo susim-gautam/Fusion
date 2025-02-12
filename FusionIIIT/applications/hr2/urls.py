@@ -1,12 +1,20 @@
 from django.conf.urls import url, include 
 
+from django.conf.urls import url, include
 from applications.hr2 import views
 from applications.hr2.api import form_views
+
 
 app_name = 'hr2'
 
 urlpatterns = [
+   
+    url(r'^api/check_hr_access$', views.test, name='check_hr_access'),
 
+
+
+
+    
     # url(r'^$', views.service_book, name='hr2'),
     # url(r'^hradmin/$', views.hr_admin, name='hradmin'),
     # url(r'^edit/(?P<id>\d+)/$', views.edit_employee_details,
