@@ -9,7 +9,7 @@ app_name = 'hr2'
 
 urlpatterns = [
    
-    url(r'^api/check_hr_access$', views.test, name='check_hr_access'),
+    url(r'^api/get_leave_balance', views.get_leave_balance, name='get_leave_balance'),
 
 
 

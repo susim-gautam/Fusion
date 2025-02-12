@@ -95,4 +95,84 @@ def test(request):
     
 
 
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+from django.http import JsonResponse
+from .models import LeaveBalance, LeavePerYear
+from applications.globals.models import ExtraInfo
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_leave_balance(request):
+    """
+    API endpoint to retrieve the leave balance for the authenticated user.
+    Returns:
+        - A JSON response containing the leave balance for each leave type.
+    """
+    user = request.user
+
+    # Check if the user is authenticated
+    if not user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+
+
+    # check if the user has HR access
+    if not check_hr_access(request):
+        return JsonResponse({'error': 'HR access required'}, status=403)
     
+    try:
+        # Fetch the ExtraInfo object for the user
+        extra_info = ExtraInfo.objects.get(user=user)
+
+        # Fetch the leave balance for the user
+        leave_balance = LeaveBalance.objects.filter(empid__id=user.id).first()
+        leave_per_year = LeavePerYear.objects.filter(empid__id=user.id).first()
+
+        if not leave_balance or not leave_per_year:
+            return JsonResponse({'error': 'Leave balance data not found'}, status=404)
+
+        # Prepare the response data
+        leave_data = {
+            'casual_leave': {
+                'allotted': leave_per_year.casual_leave_allotted,
+                'taken': leave_balance.casual_leave_taken,
+                'balance': leave_per_year.casual_leave_allotted - leave_balance.casual_leave_taken,
+            },
+            'special_casual_leave': {
+                'allotted': leave_per_year.special_casual_leave_allotted,
+                'taken': leave_balance.special_casual_leave_taken,
+                'balance': leave_per_year.special_casual_leave_allotted - leave_balance.special_casual_leave_taken,
+            },
+            'earned_leave': {
+                'allotted': leave_per_year.earned_leave_allotted,
+                'taken': leave_balance.earned_leave_taken,
+                'balance': leave_per_year.earned_leave_allotted - leave_balance.earned_leave_taken,
+            },
+            'commuted_leave': {
+                'allotted': leave_per_year.commuted_leave_allotted,
+                'taken': leave_balance.commuted_leave_taken,
+                'balance': leave_per_year.commuted_leave_allotted - leave_balance.commuted_leave_taken,
+            },
+            'restricted_holiday': {
+                'allotted': leave_per_year.restricted_holiday_allotted,
+                'taken': leave_balance.restricted_holiday_taken,
+                'balance': leave_per_year.restricted_holiday_allotted - leave_balance.restricted_holiday_taken,
+            },
+            'vacation_leave': {
+                'allotted': leave_per_year.vacation_leave_allotted,
+                'taken': leave_balance.vacation_leave_taken,
+                'balance': leave_per_year.vacation_leave_allotted - leave_balance.vacation_leave_taken,
+            },
+        }
+
+        # Return the leave balance data
+        return JsonResponse({'leave_balance': leave_data}, status=200)
+
+    except ExtraInfo.DoesNotExist:
+        return JsonResponse({'error': 'User details not found'}, status=404)
+    except Exception as e:
+        # Handle any unexpected errors
+        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)    
