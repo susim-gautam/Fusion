@@ -1,5 +1,5 @@
 from django.db import models
-from applications.globals.models import ExtraInfo
+from applications.globals.models import ExtraInfo, Designation
 # from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.auth.models import User
 from datetime import date
@@ -392,6 +392,10 @@ class LeaveForm(models.Model):
     approvedDate = models.DateField(auto_now_add=True, null=True)
     approved_by = models.ForeignKey(Employee, on_delete=models.CASCADE, null=True, related_name='leave_approved_by')
     
+    first_recieved_by = models.ForeignKey(Employee, on_delete=models.CASCADE, null=True, related_name='leave_first_recieved_by')
+    first_recieved_designation=models.ForeignKey(Designation, on_delete=models.CASCADE, null=True, related_name='leave_first_recieved_designation')
+
+
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Pending')
     # New field to store PDF as binary data
     attached_pdf = models.BinaryField(null=True, blank=True)
