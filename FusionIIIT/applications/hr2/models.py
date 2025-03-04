@@ -3,6 +3,8 @@ from applications.globals.models import ExtraInfo, Designation
 # from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.auth.models import User
 from datetime import date
+from django.contrib.postgres.fields import JSONField
+from django.conf import settings
 
 class Constants:
     # Class for various choices on the enumerations
@@ -256,39 +258,114 @@ class WorkAssignemnt(models.Model):
     job_title = models.CharField(max_length=50, default='')
     orders_copy = models.FileField(blank=True, null=True)
 
-class LTCform(models.Model):
-    id = models.AutoField(primary_key=True)
-    employeeId = models.IntegerField()
-    name = models.CharField(max_length=100, null=True)
-    blockYear = models.TextField() #
-    pfNo = models.IntegerField()
-    basicPaySalary = models.IntegerField(null=True)
-    designation = models.CharField(max_length=50)
-    departmentInfo = models.CharField(max_length=50)
-    leaveRequired = models.BooleanField(default=False,null=True) #
-    leaveStartDate = models.DateField(null=True, blank=True)
-    leaveEndDate = models.DateField(null=True, blank=True)
-    dateOfDepartureForFamily = models.DateField(null=True, blank=True) #
-    natureOfLeave = models.TextField(null=True,blank=True)
-    purposeOfLeave = models.TextField(null=True,blank=True)
-    hometownOrNot = models.BooleanField(default=False)
-    placeOfVisit = models.TextField(max_length=100, null=True, blank=True) 
-    addressDuringLeave = models.TextField(null=True)
-    modeofTravel = models.TextField(max_length=10, null=True,blank=True) #
-    detailsOfFamilyMembersAlreadyDone = models.JSONField(null=True,blank=True)
-    detailsOfFamilyMembersAboutToAvail = models.JSONField(max_length=100, null=True,blank=True) 
-    detailsOfDependents = models.JSONField(blank=True,null=True) 
-    amountOfAdvanceRequired = models.IntegerField(null=True, blank=True)
-    certifiedThatFamilyDependents = models.BooleanField(blank=True,null=True) 
-    certifiedThatAdvanceTakenOn = models.DateField(null=True, blank=True) 
-    adjustedMonth = models.TextField(max_length=50, null=True,blank=True)
-    submissionDate = models.DateField(null=True)
-    phoneNumberForContact = models.BigIntegerField()
-    approved = models.BooleanField(null=True)
-    approvedDate = models.DateField(auto_now_add=True, null=True)
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE, null=True, related_name='LTC_created_by')
-    approved_by = models.ForeignKey(User, on_delete=models.CASCADE, null=True, related_name='LTC_approved_by')
+    
 
+# LTC part start
+
+
+
+class LtcBlockYear(models.Model):
+    block_year_id = models.AutoField(primary_key=True)
+    start_date = models.DateField()
+    end_date = models.DateField()
+
+    def __str__(self):
+        return f"Block Year {self.block_year_id} ({self.start_date} to {self.end_date})"
+
+class LtcSubBlockYear(models.Model):
+    sub_block_year_id = models.AutoField(primary_key=True)
+    block_year = models.ForeignKey(LtcBlockYear, on_delete=models.CASCADE)
+    sub_block_name = models.CharField(max_length=50)
+    start_date = models.DateField()
+    end_date = models.DateField()
+
+    def __str__(self):
+        return f"{self.sub_block_name} ({self.start_date} to {self.end_date})"
+
+class LTCForm(models.Model):
+    MODE_TRAVEL_CHOICES = [
+        ('Rail', 'Rail'),
+        ('Road', 'Road'),
+        ('Air', 'Air'),
+    ]
+    STATUS_CHOICES = [
+        ('Pending', 'Pending'),
+        ('Approved', 'Approved'),
+        ('Rejected', 'Rejected'),
+    ]
+
+    ltc_form_id = models.AutoField(primary_key=True)
+    block_year = models.ForeignKey(LtcBlockYear, on_delete=models.CASCADE)
+    sub_block_year = models.ForeignKey(LtcSubBlockYear, on_delete=models.CASCADE)
+    provident_fund_number = models.CharField(max_length=50)
+    basic_pay = models.DecimalField(max_digits=10, decimal_places=2)
+    employee = models.ForeignKey('Employee', on_delete=models.CASCADE)
+    name = models.CharField(max_length=100)
+    designation = models.CharField(max_length=50)
+    department = models.CharField(max_length=50)
+    leave_required = models.BooleanField(default=False)
+    leave_form = models.ForeignKey('LeaveForm', on_delete=models.SET_NULL, null=True, blank=True)
+    destination = models.CharField(max_length=255)
+    address_during_leave = models.TextField()
+    mode_of_travel = models.CharField(max_length=20, choices=MODE_TRAVEL_CHOICES)
+    list_of_family_members = JSONField()
+    transaction = models.ForeignKey('Transaction', on_delete=models.SET_NULL, null=True, blank=True)
+    list_of_dependents = JSONField()
+    advance_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    previous_ltc_date = models.DateField(null=True, blank=True)
+    adjusted_month = models.CharField(max_length=20, null=True, blank=True)
+    application_date = models.DateField(auto_now_add=True)
+    contact_number = models.CharField(max_length=15)
+    attached_file = models.BinaryField(null=True, blank=True)
+    hod_recommendation = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
+    approved_by = models.ForeignKey('Employee', on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_forms')
+    remarks = models.TextField()
+
+    def __str__(self):
+        return f"LTC Form {self.ltc_form_id} - {self.name}"
+
+class Transaction(models.Model):
+    TRANSACTION_TYPE_CHOICES = [
+        ('ltc_claim', 'LTC Claim'),
+        ('advance', 'Advance'),
+        ('refund', 'Refund'),
+    ]
+
+    transaction_id = models.AutoField(primary_key=True)
+    ltc_form = models.ForeignKey(LTCForm, on_delete=models.CASCADE)
+    employee = models.ForeignKey('Employee', on_delete=models.CASCADE)
+    sub_block_year = models.ForeignKey(LtcSubBlockYear, on_delete=models.CASCADE)
+    transaction_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    transaction_date = models.DateTimeField(auto_now_add=True)
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPE_CHOICES)
+    transaction_done_by = models.ForeignKey('Employee', on_delete=models.SET_NULL, null=True, blank=True, related_name='transactions_done')
+    remarks = models.TextField()
+    attached_file = models.BinaryField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Transaction {self.transaction_id} - {self.transaction_type}"
+
+class DependentTransaction(models.Model):
+    transaction = models.OneToOneField(Transaction, primary_key=True, on_delete=models.CASCADE)
+    ltc_form = models.ForeignKey(LTCForm, on_delete=models.CASCADE)
+    dependent = models.ForeignKey('EmployeeDependents', on_delete=models.CASCADE)
+    sub_block_year = models.ForeignKey(LtcSubBlockYear, on_delete=models.CASCADE)
+    transaction_date = models.DateTimeField(auto_now_add=True)
+    transaction_done_by = models.ForeignKey('Employee', on_delete=models.SET_NULL, null=True, blank=True, related_name='dependent_transactions')
+    remarks = models.TextField()
+
+    def __str__(self):
+        return f"Dependent Transaction for {self.dependent.name}"
+
+
+
+
+
+
+
+
+# LTC part end
 
 
 class CPDAAdvanceform(models.Model):
