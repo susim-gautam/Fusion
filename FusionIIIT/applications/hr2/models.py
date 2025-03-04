@@ -258,7 +258,7 @@ class WorkAssignemnt(models.Model):
     job_title = models.CharField(max_length=50, default='')
     orders_copy = models.FileField(blank=True, null=True)
 
-    
+
 
 # LTC part start
 
@@ -309,7 +309,7 @@ class LTCForm(models.Model):
     address_during_leave = models.TextField()
     mode_of_travel = models.CharField(max_length=20, choices=MODE_TRAVEL_CHOICES)
     list_of_family_members = JSONField()
-    transaction = models.ForeignKey('Transaction', on_delete=models.SET_NULL, null=True, blank=True)
+    transaction = models.ForeignKey('LTCTransaction', on_delete=models.SET_NULL, null=True, blank=True)
     list_of_dependents = JSONField()
     advance_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     previous_ltc_date = models.DateField(null=True, blank=True)
@@ -319,13 +319,13 @@ class LTCForm(models.Model):
     attached_file = models.BinaryField(null=True, blank=True)
     hod_recommendation = models.TextField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
-    approved_by = models.ForeignKey('Employee', on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_forms')
-    remarks = models.TextField()
+    approved_by = models.ForeignKey('Employee', on_delete=models.SET_NULL, null=True, related_name='approved_ltc_forms')
+    remarks = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"LTC Form {self.ltc_form_id} - {self.name}"
 
-class Transaction(models.Model):
+class LTCTransaction(models.Model):
     TRANSACTION_TYPE_CHOICES = [
         ('ltc_claim', 'LTC Claim'),
         ('advance', 'Advance'),
@@ -339,31 +339,24 @@ class Transaction(models.Model):
     transaction_amount = models.DecimalField(max_digits=10, decimal_places=2)
     transaction_date = models.DateTimeField(auto_now_add=True)
     transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPE_CHOICES)
-    transaction_done_by = models.ForeignKey('Employee', on_delete=models.SET_NULL, null=True, blank=True, related_name='transactions_done')
-    remarks = models.TextField()
+    transaction_done_by = models.ForeignKey('Employee', on_delete=models.SET_NULL, null=True, related_name='transactions_done')
+    remarks = models.TextField(null=True, blank=True)
     attached_file = models.BinaryField(null=True, blank=True)
 
     def __str__(self):
         return f"Transaction {self.transaction_id} - {self.transaction_type}"
 
 class DependentTransaction(models.Model):
-    transaction = models.OneToOneField(Transaction, primary_key=True, on_delete=models.CASCADE)
+    transaction = models.OneToOneField(LTCTransaction, primary_key=True, on_delete=models.CASCADE)
     ltc_form = models.ForeignKey(LTCForm, on_delete=models.CASCADE)
     dependent = models.ForeignKey('EmployeeDependents', on_delete=models.CASCADE)
     sub_block_year = models.ForeignKey(LtcSubBlockYear, on_delete=models.CASCADE)
     transaction_date = models.DateTimeField(auto_now_add=True)
-    transaction_done_by = models.ForeignKey('Employee', on_delete=models.SET_NULL, null=True, blank=True, related_name='dependent_transactions')
-    remarks = models.TextField()
+    transaction_done_by = models.ForeignKey('Employee', on_delete=models.SET_NULL, null=True, related_name='dependent_transactions')
+    remarks = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"Dependent Transaction for {self.dependent.name}"
-
-
-
-
-
-
-
 
 # LTC part end
 
