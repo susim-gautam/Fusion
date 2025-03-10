@@ -12,6 +12,8 @@ urlpatterns = [
     url(r'^api/get_leave_balance', views.get_leave_balance, name='get_leave_balance'),
     url(r'^api/search_employees', views.search_employees, name='search_employees'),
     url(r'^api/get_form_initials', views.get_form_initials, name='get_form_initials'),
+    url(r'^api/submit_leave_form', views.submit_leave_form, name='submit_leave_form'),
+    url(r'^api/get_leave_requests', views.get_leave_requests, name='get_leave_requests'),
 
 
 

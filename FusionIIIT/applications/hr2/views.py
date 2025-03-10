@@ -18,8 +18,8 @@ from rest_framework.decorators import api_view, permission_classes,authenticatio
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from decimal import Decimal, InvalidOperation
-
-from .models import LeaveBalance, LeavePerYear, EmpConfidentialDetails , Employee
+from datetime import datetime, timedelta
+from .models import LeaveBalance, LeavePerYear, EmpConfidentialDetails , Employee, LeaveForm
 from applications.globals.models import ExtraInfo
 
 
@@ -272,3 +272,207 @@ def get_form_initials(request):
     except Exception as e:
         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
 
+
+
+
+
+
+
+
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def submit_leave_form(request):
+    """
+    API endpoint to submit a leave form for the authenticated user.
+    """
+    user = request.user
+
+    if not user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    try:
+        form_data = request.POST
+        files = request.FILES
+
+        # Extract form data
+        name = form_data.get('name')
+        designation = form_data.get('designation')
+        pfno = form_data.get('pfno')
+        submissionDate = form_data.get('date')
+        department = form_data.get('department')
+        leave_start_date = form_data.get('leaveStartDate')
+        leave_end_date = form_data.get('leaveEndDate')
+        purpose = form_data.get('purpose')
+        casual_leave = form_data.get('casualLeave', 0)
+        vacation_leave = form_data.get('vacationLeave', 0)
+        earned_leave = form_data.get('earnedLeave', 0)
+        commuted_leave = form_data.get('commutedLeave', 0)
+        special_casual_leave = form_data.get('specialCasualLeave', 0)
+        restricted_holiday = form_data.get('restrictedHoliday', 0)
+        remarks = form_data.get('remarks')
+        station_leave = form_data.get('stationLeave', 'false').lower() == 'true'
+        station_leave_start_date = form_data.get('stationLeaveStartDate')
+        station_leave_end_date = form_data.get('stationLeaveEndDate')
+        station_leave_address = form_data.get('stationLeaveAddress')
+        academic_responsibility_id = form_data.get('academicResponsibility')
+        academic_responsibility_designation = form_data.get('academicResponsibility_designation')
+        administrative_responsibility_id = form_data.get('administrativeResponsibility')
+        administrative_responsibility_designation = form_data.get('administrativeResponsibility_designation')
+        first_recieved_by_id = form_data.get('forwardTo')
+        first_recieved_designation = form_data.get('forwardTo_designation')
+        attached_pdf = files.get('attached_pdf')
+
+        # Validate required fields
+        if not all([name, designation, pfno, department, leave_start_date, leave_end_date, purpose, remarks]):
+            return JsonResponse({'error': 'All required fields must be provided'}, status=400)
+
+        # Validate leave dates
+        try:
+            leave_start_date = datetime.strptime(leave_start_date, "%Y-%m-%d").date()
+            leave_end_date = datetime.strptime(leave_end_date, '%Y-%m-%d').date()
+            if leave_end_date < leave_start_date:
+                return JsonResponse({'error': 'Leave end date cannot be before start date'}, status=400)
+        except ValueError:
+            return JsonResponse({'error': 'Invalid leave date format. Use YYYY-MM-DD'}, status=400)
+
+        # Validate station leave fields if station leave is checked
+        if station_leave:
+            if not all([station_leave_start_date, station_leave_end_date, station_leave_address]):
+                return JsonResponse({'error': 'Station leave details are required when station leave is checked'}, status=400)
+            try:
+                station_leave_start_date = datetime.strptime(station_leave_start_date, '%Y-%m-%d').date()
+                station_leave_end_date = datetime.strptime(station_leave_end_date, '%Y-%m-%d').date()
+                if station_leave_end_date < station_leave_start_date:
+                    return JsonResponse({'error': 'Station leave end date cannot be before start date'}, status=400)
+            except ValueError:
+                return JsonResponse({'error': 'Invalid station leave date format. Use YYYY-MM-DD'}, status=400)
+        else:
+            # Set station leave fields to None if station leave is not checked
+            station_leave_start_date = None
+            station_leave_end_date = None
+            station_leave_address = None
+
+        # Get the employee associated with the user
+        try:
+            employee = Employee.objects.get(id=user.id)
+        except Employee.DoesNotExist:
+            return JsonResponse({'error': 'Employee not found'}, status=404)
+
+        # Get the academic responsibility user
+        try:
+            academic_responsibility_user = Employee.objects.get(id=academic_responsibility_id)
+        except Employee.DoesNotExist:
+            return JsonResponse({'error': 'Academic Responsibility user not found'}, status=404)
+
+        # Get the administrative responsibility user
+        try:
+            administrative_responsibility_user = Employee.objects.get(id=administrative_responsibility_id)
+        except Employee.DoesNotExist:
+            return JsonResponse({'error': 'Administrative Responsibility user not found'}, status=404)
+
+        # Get the first received by user
+        try:
+            first_recieved_by_user = Employee.objects.get(id=first_recieved_by_id)
+        except Employee.DoesNotExist:
+            return JsonResponse({'error': 'First Received By user not found'}, status=404)
+
+        # Get the first received designation
+        try:
+            first_recieved_designation = Designation.objects.get(name=first_recieved_designation)
+        except Designation.DoesNotExist:
+            return JsonResponse({'error': 'First Received By designation not found'}, status=404)
+
+        # Handle attached PDF file
+        attached_pdf_binary = None
+        if attached_pdf:
+            attached_pdf_binary = attached_pdf.read()
+
+        # Create and save the leave form
+        leave_form = LeaveForm(
+            employee=employee,
+            name=name,
+            designation=designation,
+            personalfileNo=pfno,
+            submissionDate=submissionDate,
+            departmentInfo=department,
+            leaveStartDate=leave_start_date,
+            leaveEndDate=leave_end_date,
+            Purpose_of_leave=purpose,
+            Noof_CasualLeave=casual_leave,
+            Noof_vacationLeave=vacation_leave,
+            Noof_earnedLeave=earned_leave,
+            Noof_commutedLeave=commuted_leave,
+            Noof_specialCasualLeave=special_casual_leave,
+            Noof_restrictedHoliday=restricted_holiday,
+            Remarks=remarks,
+            LeavingStation=station_leave,
+            StationLeave_startdate=station_leave_start_date,
+            StationLeave_enddate=station_leave_end_date,
+            Address_During_StationLeave=station_leave_address,
+            AcademicResponsibility_user=academic_responsibility_user,
+            AcademicResponsibility_designation=academic_responsibility_designation,
+            AdministrativeResponsibility_user=administrative_responsibility_user,
+            AdministrativeResponsibility_designation=administrative_responsibility_designation,
+            first_recieved_by=first_recieved_by_user,
+            first_recieved_designation=first_recieved_designation,
+            status='Pending',
+            attached_pdf=attached_pdf_binary,
+        )
+        leave_form.save()
+        return JsonResponse({'message': 'Leave form submitted successfully'}, status=200)
+
+    except ValidationError as e:
+        return JsonResponse({'error': f'Validation error: {str(e)}'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+    
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_leave_requests(request):
+    """
+    API endpoint to get the leave requests for the authenticated user.
+    """
+    user = request.user
+
+    if not user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    try:
+        # Get the employee associated with the user
+        employee = Employee.objects.filter(id=user)
+        
+
+        if not employee.exists():
+            return JsonResponse({'error': 'Employee not found'}, status=404)
+        employee = employee.first()
+        query_date=request.GET.get('date')
+        if not query_date:
+            # set 1 year back date
+            query_date = datetime.now().date() - timedelta(days=365)
+        else:
+            query_date = datetime.strptime(query_date, '%Y-%m-%d').date()
+        # Get the leave forms for the employee
+        leave_forms = LeaveForm.objects.filter(employee=employee, submissionDate__gte=query_date)
+
+        # Prepare the response data
+        leave_requests = []
+        # send only id submissionDate, status, leaveStartDate, leaveEndDate,
+        for form in leave_forms:
+            leave_requests.append({
+                'id': form.id,
+                'name': form.name,
+                'submissionDate': form.submissionDate,
+                'status': form.status,
+                'leaveStartDate': form.leaveStartDate,
+                'leaveEndDate': form.leaveEndDate,
+            })
+        
+        return JsonResponse({'leave_requests': leave_requests}, status=200)
+    except Exception as e:
+        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+    

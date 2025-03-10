@@ -352,7 +352,7 @@ class LeaveForm(models.Model):
     name = models.CharField(max_length=40, null=True)
     designation = models.CharField(max_length=40, null=True)
     submissionDate = models.DateField(default=date.today)
-    personalfileNo = models.IntegerField(null=True)
+    personalfileNo = models.CharField(max_length=50,null=True)
     departmentInfo = models.CharField(max_length=40, null=True)
     
     leaveStartDate = models.DateField(blank=True, null=True)
@@ -377,6 +377,7 @@ class LeaveForm(models.Model):
         null=True, 
         related_name='academic_responsibility_user'
     )
+    AcademicResponsibility_designation=models.TextField(default='Assisttant professor') 
     AcademicResponsibility_accepted = models.BooleanField(default=False)
     
     AdministrativeResponsibility_user = models.ForeignKey(
@@ -385,6 +386,7 @@ class LeaveForm(models.Model):
         null=True, 
         related_name='administrative_responsibility_user'
     )
+    AdministrativeResponsibility_designation=models.TextField(default='Assisttant professor')
     AdministrativeResponsibility_accepted = models.BooleanField(default=False)
     
     Remarks = models.TextField(null=True, blank=True)
