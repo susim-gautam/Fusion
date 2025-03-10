@@ -19,6 +19,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from decimal import Decimal, InvalidOperation
 
+from .models import LeaveBalance, LeavePerYear, EmpConfidentialDetails , Employee
+from applications.globals.models import ExtraInfo
+
 
 
 
@@ -95,12 +98,7 @@ def test(request):
     
 
 
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
-from rest_framework.authentication import TokenAuthentication
-from rest_framework.permissions import IsAuthenticated
-from django.http import JsonResponse
-from .models import LeaveBalance, LeavePerYear
-from applications.globals.models import ExtraInfo
+
 
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])
@@ -176,3 +174,101 @@ def get_leave_balance(request):
     except Exception as e:
         # Handle any unexpected errors
         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)    
+    
+
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def search_employees(request):
+    """
+    API endpoint to search for employees based on the given search query.
+    Returns:
+        - A JSON response containing the list of employees matching the search query.
+    """
+    user = request.user
+
+    # Check if the user has HR access
+    if not check_hr_access(request):
+        return JsonResponse({'error': 'HR access required'}, status=403)
+
+    try:
+        search_text = request.GET.get("search_text", "").strip()
+
+        if not search_text:
+            return JsonResponse({"error": "Search text is required"}, status=400)
+
+        users = User.objects.filter(username__icontains=search_text)
+        user_list = []
+
+        for user in users:
+        
+            # Fetch designations from HoldsDesignation model
+            designations = HoldsDesignation.objects.filter(user=user)
+
+            if not designations.exists():
+                continue  # Skip users without designations
+
+            for hd in designations:
+                
+                user_list.append({
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "designation": hd.designation.name,  # Assuming designation has a 'name' field
+                })
+
+        return JsonResponse({"employees": user_list}, status=200)
+
+    except Exception as e:
+        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+    
+
+# get my form initials name, last_selected_role, and department, pfno
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_form_initials(request):
+    """
+    API endpoint to get the form initials for the authenticated user.
+    Returns:
+        - A JSON response containing the form initials for the authenticated user.
+    """
+    user = request.user
+
+    # Check if the user is authenticated
+    if not user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    try:
+        # fecth employee
+        employee = Employee.objects.filter(id=user)
+        if not employee.exists():
+            return JsonResponse({'error': 'Employee not found'}, status=404)
+        employee = employee.first()
+        # fetch extra info
+        extra_info = ExtraInfo.objects.filter(user=user)
+        if not extra_info.exists():
+            return JsonResponse({'error': 'ExtraInfo not found'}, status=404)
+        extra_info = extra_info.first()
+
+        Empconfidential=EmpConfidentialDetails.objects.filter(empid=employee)
+        if not Empconfidential.exists():
+            return JsonResponse({'error': 'EmpConfidentialDetails not found'}, status=404)
+        Empconfidential=Empconfidential.first()
+        dpt=extra_info.department
+
+        
+        return JsonResponse({
+             
+            'name': user.first_name+" "+user.last_name,
+            'last_selected_role': extra_info.last_selected_role,
+            'pfno': Empconfidential.personal_file_number,
+            'department': dpt.name if dpt else None,
+
+
+        }, status=200)
+    except Exception as e:
+        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+
