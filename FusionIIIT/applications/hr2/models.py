@@ -3,6 +3,7 @@ from applications.globals.models import ExtraInfo, Designation
 # from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.auth.models import User
 from datetime import date
+from  applications.filetracking.models import File
 
 class Constants:
     # Class for various choices on the enumerations
@@ -377,8 +378,8 @@ class LeaveForm(models.Model):
         null=True, 
         related_name='academic_responsibility_user'
     )
-    AcademicResponsibility_designation=models.TextField(default='Assisttant professor') 
-    AcademicResponsibility_accepted = models.BooleanField(default=False)
+    AcademicResponsibility_designation=models.ForeignKey(Designation, on_delete=models.CASCADE, null=True, related_name='leave_academic_responsibility_designation') 
+    AcademicResponsibility_status=models.CharField(max_length=10, choices=STATUS_CHOICES, default='Pending')
     
     AdministrativeResponsibility_user = models.ForeignKey(
         Employee, 
@@ -386,13 +387,14 @@ class LeaveForm(models.Model):
         null=True, 
         related_name='administrative_responsibility_user'
     )
-    AdministrativeResponsibility_designation=models.TextField(default='Assisttant professor')
-    AdministrativeResponsibility_accepted = models.BooleanField(default=False)
+    AdministrativeResponsibility_designation=models.ForeignKey(Designation, on_delete=models.CASCADE, null=True, related_name='leave_administrative_responsibility_designation')
+    AdministrativeResponsibility_status=models.CharField(max_length=10, choices=STATUS_CHOICES, default='Pending')
     
     Remarks = models.TextField(null=True, blank=True)
     
     approvedDate = models.DateField(auto_now_add=True, null=True)
     approved_by = models.ForeignKey(Employee, on_delete=models.CASCADE, null=True, related_name='leave_approved_by')
+    approved_by_designation=models.ForeignKey(Designation, on_delete=models.CASCADE, null=True, related_name='leave_approved_by_designation')
     
     first_recieved_by = models.ForeignKey(Employee, on_delete=models.CASCADE, null=True, related_name='leave_first_recieved_by')
     first_recieved_designation=models.ForeignKey(Designation, on_delete=models.CASCADE, null=True, related_name='leave_first_recieved_designation')
@@ -401,6 +403,8 @@ class LeaveForm(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Pending')
     # New field to store PDF as binary data
     attached_pdf = models.BinaryField(null=True, blank=True)
+    attached_pdf_name = models.CharField(max_length=100, null=True, blank=True)
+    file_id=models.IntegerField(null=True, blank=True)
 
     def __str__(self):
         return f"Leave Application {self.id} - {self.employee.empid.username}"
