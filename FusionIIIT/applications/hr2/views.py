@@ -636,6 +636,7 @@ def get_leave_form_by_id(request, form_id):
             'approvedBy': approved_by_name,
             'approvedByDesignation': approved_by_designation,
             'approvedDate': approved_date,
+            'file_id': leave_form.file_id,
         }
         # #print("3") 
         # #print(leave_form_data)
@@ -962,6 +963,7 @@ def get_leave_inbox(request):
             src_object_id = i['src_object_id']
             leave_form = LeaveForm.objects.get(id=src_object_id)
             i['status'] = leave_form.status
+        
         #print("10")
         
 
@@ -1006,5 +1008,185 @@ def download_leave_form_pdf(request, form_id):
         response = HttpResponse(attached_pdf, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="{attached_pdf_name}"'
         return response
+    except Exception as e:
+        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+    
+
+# {'file_history': [OrderedDict([('id', 490), ('receive_date', '2025-03-11T16:53:15.057424'), ('forward_date', '2025-03-11T16:53:15.057424'), ('remarks', 'File with id:635 created by vkjain and sent to vkjain'), ('upload_file', None), ('is_read', False), ('tracking_extra_JSON', {'type': 'Leave'}), ('file_id', 635), ('current_id', 'vkjain'), ('current_design', 4354), ('receiver_id', 5350), ('receive_design', 15)])]}
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def track_file_react(request, id):
+    # Fetching the file history as a list of dictionaries
+    user=request.user
+    file_history = view_history(file_id=id)
+    print(user.id)
+    # Create a JSON response for React
+    response_data = {
+        'file_history': file_history
+    }
+    # for each designation id get designation name
+    for i in response_data['file_history']:
+        
+        
+
+        if i['receiver_id']:
+            user = User.objects.get(id=i['receiver_id'])
+            if user:
+                i['receiver_id'] = user.first_name + " " + user.last_name 
+        if i['receive_design']:
+            designation = Designation.objects.get(id=i['receive_design'])
+            if designation:
+                i['receive_design'] = designation.name
+
+    
+    return JsonResponse(response_data)
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def handle_leave_file(request, form_id):
+    user=request.user
+    data = json.loads(request.body)
+    action = data.get('action')
+    remarks = data.get('fileRemarks')
+    forwardtouser=data.get('forwardTo')
+    forwardToDesignation=data.get('forwardToDesignation')
+    
+    
+    if not user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    try:
+        # get employee of user
+        employee = Employee.objects.filter(id=user)
+        if not employee.exists():
+            return JsonResponse({'error': 'Employee not found'}, status=404)
+        
+        # get last selected role of user
+        extra_info = ExtraInfo.objects.filter(user=user)
+        if not extra_info.exists():
+            return JsonResponse({'error': 'ExtraInfo not found'}, status=404)
+        extra_info = extra_info.first()
+
+        last_selected_role = extra_info.last_selected_role
+
+        # get leave form by form id
+        leave_form = LeaveForm.objects.filter(id=form_id)
+        if not leave_form.exists():
+            return JsonResponse({'error': 'Leave form not found'}, status=404)
+        
+        file_id=leave_form.first().file_id
+
+       
+        current_owner = get_current_file_owner(file_id)
+        current_owner_designation=get_current_file_owner_designation(file_id)
+
+        
+        print(current_owner)
+        print(current_owner_designation)
+        # match user's username with current owner
+        
+
+        if user.username != current_owner.username:
+            return JsonResponse({'error': 'You do not have access to handle this file'}, status=403)
+        
+        if last_selected_role != current_owner_designation.name:
+            return JsonResponse({'error': 'You do not have access to handle this file'}, status=403)
+        # get action
+        if action not in ['forward', 'reject', 'accept']:
+            return JsonResponse({'error': 'Invalid action'}, status=400)
+        
+        if action == 'reject':
+            # reject the file
+            remarks = f"Rejected by {current_owner} with remarks: {remarks}"
+            # get uploader of form
+            uploader_employee = leave_form.first().employee
+            uploader = uploader_employee.id
+            uploader_designation=leave_form.first().designation
+            print(uploader)
+            print(uploader_designation)
+            
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=uploader,
+                receiver_designation=uploader_designation,
+                remarks=remarks,
+                file_extra_JSON=None
+            )
+            # change status of leave form
+            print(leave_form.first().status)
+            leave_instance = leave_form.first()
+            leave_instance.status = 'Rejected'
+            leave_instance.save()
+            return JsonResponse({'message': 'File rejected successfully'}, status=200)
+        
+        if action =='forward':
+            # forward the file
+            remarks = f"Forwarded by {current_owner} with remarks: {remarks}"
+            # get forward to user
+            
+            print(forwardtouser)
+            # get username with user id
+            forwardtouser = User.objects.get(id=forwardtouser).username
+           
+            
+            forward_to_designation = Designation.objects.get(name=forwardToDesignation)
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=forwardtouser,
+                receiver_designation=forward_to_designation,
+                remarks=remarks,
+                file_extra_JSON=None
+            )
+            return JsonResponse({'message': 'File forwarded successfully'}, status=200)
+        
+        if action == 'accept':
+            # accept the file
+            remarks = f"Accepted by {current_owner} with remarks: {remarks}"
+            
+            # get employee of leave form
+            leave_instance = leave_form.first()
+            leave_instance.status = 'Accepted'
+            approvedDate = datetime.now().date()
+            approved_by_employee = Employee.objects.get(id=user)
+            # get approved_by_designation
+            approved_by_designation = Designation.objects.get(name=last_selected_role)
+            leave_instance.approved_by = approved_by_employee
+            leave_instance.approved_by_designation = approved_by_designation
+            leave_instance.approvedDate = approvedDate
+           
+            uploader_employee = leave_instance.employee
+            # get leave balance of employee
+            leave_balance = LeaveBalance.objects.filter(empid=uploader_employee).first()
+            if not leave_balance:
+                return JsonResponse({'error': 'Leave balance not found'}, status=404)
+            # update the leave taken in leave balance
+            print("hi  1 ")
+            
+            leave_balance.casual_leave_taken += leave_instance.Noof_CasualLeave
+            leave_balance.vacation_leave_taken += leave_instance.Noof_vacationLeave
+            leave_balance.earned_leave_taken += leave_instance.Noof_earnedLeave
+            leave_balance.commuted_leave_taken += leave_instance.Noof_commutedLeave
+            leave_balance.special_casual_leave_taken += leave_instance.Noof_specialCasualLeave
+            leave_balance.restricted_holiday_taken += leave_instance.Noof_restrictedHoliday
+
+            
+            # return JsonResponse({'message': 'File accepted successfully'}, status=200)
+            # verify leave form save
+            leave_balance.save()
+            print(leave_balance.casual_leave_taken)
+            leave_instance.save() 
+            track_id = forward_file(
+                file_id=file_id,
+                receiver=current_owner,
+                receiver_designation=current_owner_designation,
+                remarks=remarks,
+                file_extra_JSON=None
+            )
+            return JsonResponse({'message': 'File accepted successfully'}, status=200)
+
+        return JsonResponse({'error': 'Invalid action'}, status=400)
     except Exception as e:
         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)

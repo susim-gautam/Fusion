@@ -19,7 +19,9 @@ urlpatterns = [
     url(r'^api/handle_leave_administrative_responsibility/(?P<form_id>\d+)/$', views.handle_leave_administrative_responsibility, name='handle_leave_administrative_responsibility'),
     url(r'^api/get_leave_inbox', views.get_leave_inbox, name='get_leave_inbox'),
     url(r'^api/download_leave_form_pdf/(?P<form_id>\d+)/$', views.download_leave_form_pdf, name='download_leave_form_pdf'),
+    url(r'^api/handle_leave_file/(?P<form_id>\d+)/$', views.handle_leave_file, name='handle_leave_file'),
 
+    url(r'api/get_track_file/(?P<id>\d+)/$', views.track_file_react, name='track_file_react'),
 
 
 
