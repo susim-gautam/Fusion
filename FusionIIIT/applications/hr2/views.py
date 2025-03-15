@@ -54,13 +54,24 @@ def check_hr_access(request):
         extra_info = get_object_or_404(ExtraInfo, user=user)
         last_selected_role=extra_info.last_selected_role
         request.session['currentDesignationSelected'] = last_selected_role
-        current_designation = HoldsDesignation.objects.filter(working=user).first()
+        print(last_selected_role)
+        # fetch designation of name last_selected_role
+        designation = Designation.objects.filter(name=last_selected_role).first()
+        
+        
+        
+        if not designation:
+            return False
+        # find holdsdesignation of user and designation
+        current_designation = HoldsDesignation.objects.filter(working=user, designation=designation).first()
         #print(f"Current Designation: {current_designation.designation.name if current_designation else None}")  # Debugging
         if not current_designation:
             return False
-
+        
+        
         # Fetch the ModuleAccess for the user's designation
         module_access = ModuleAccess.objects.filter(designation=current_designation.designation.name).first()
+        print(module_access.hr)
         if not module_access:
             return False
 
