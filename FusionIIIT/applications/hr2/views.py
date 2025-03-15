@@ -1201,3 +1201,75 @@ def handle_leave_file(request, form_id):
         return JsonResponse({'error': 'Invalid action'}, status=400)
     except Exception as e:
         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+
+
+
+
+
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_get_leave_balance(request, empid):
+    try:
+        user = request.user
+
+        # Validate user authentication
+        if not user.is_authenticated:
+            return JsonResponse({'error': 'Authentication required'}, status=401)
+
+        # Get the user's last selected role
+        extra_info = ExtraInfo.objects.filter(user=user)
+        if not extra_info.exists():
+            return JsonResponse({'error': 'ExtraInfo not found'}, status=404)
+        extra_info = extra_info.first()
+
+        
+        
+        if extra_info.last_selected_role != 'SectionHead_HR':
+            return JsonResponse({'error': 'You do not have access to get leave balance'}, status=403)
+
+        
+        # Fetch the employee data based on empid
+        try:
+            emp_user = User.objects.get(id=empid)
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+        
+        try:
+            employee = Employee.objects.get(id=emp_user)
+        except Employee.DoesNotExist:
+            return JsonResponse({'error': 'Employee not found'}, status=404)
+        
+        # Retrieve leave balance and leave per year for the employee
+        try:
+            leave_balance = LeaveBalance.objects.get(empid=employee)
+        except LeaveBalance.DoesNotExist:
+            return JsonResponse({'error': 'Leave balance not found'}, status=404)
+        
+        try:
+            leave_per_year = LeavePerYear.objects.get(empid=employee)
+        except LeavePerYear.DoesNotExist:
+            return JsonResponse({'error': 'Leave per year not found'}, status=404)
+
+        
+        # Prepare leave balance data
+        leave_balance_data = {
+            'casual_leave_allotted': leave_per_year.casual_leave_allotted,
+            'casual_leave_taken': leave_balance.casual_leave_taken,
+            'vacation_leave_allotted': leave_per_year.vacation_leave_allotted,
+            'vacation_leave_taken': leave_balance.vacation_leave_taken,
+            'earned_leave_allotted': leave_per_year.earned_leave_allotted,
+            'earned_leave_taken': leave_balance.earned_leave_taken,
+            'commuted_leave_allotted': leave_per_year.commuted_leave_allotted,
+            'commuted_leave_taken': leave_balance.commuted_leave_taken,
+            'special_casual_leave_allotted': leave_per_year.special_casual_leave_allotted,
+            'special_casual_leave_taken': leave_balance.special_casual_leave_taken,
+            'restricted_holiday_allotted': leave_per_year.restricted_holiday_allotted,
+            'restricted_holiday_taken': leave_balance.restricted_holiday_taken,
+        }
+        print(6)
+        return JsonResponse({'leave_balance': leave_balance_data}, status=200)
+    except Exception as e:
+        # Log the error message (consider using logging here for production)
+        return JsonResponse({'error': f'An unexpected error occurred: {str(e)}'}, status=500)
