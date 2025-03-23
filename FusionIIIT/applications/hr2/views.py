@@ -1279,6 +1279,94 @@ def admin_get_leave_balance(request, empid):
 
 
 
+# create a function to get department of employee
+def get_department(emp):
+    department = None
+    # get userid then get extrainfo then get department
+    user_id = emp.id
+    ext= ExtraInfo.objects.get(user__id=user_id)
+    department = ext.department
+    return department
+
+
+
+
+
+
+
+# @api_view(['GET'])
+# @authentication_classes([TokenAuthentication])
+# @permission_classes([IsAuthenticated])
+# def admin_get_all_leave_balances(request):
+#     try:
+#         user = request.user
+
+#         if not user.is_authenticated:
+#             return JsonResponse({'error': 'Authentication required'}, status=401)
+
+#         # Get the user's ExtraInfo record
+#         extra_info = ExtraInfo.objects.filter(user=user).first()
+#         if not extra_info:
+#             return JsonResponse({'error': 'ExtraInfo not found'}, status=404)
+
+#         # Validate the HR role
+#         if extra_info.last_selected_role != 'SectionHead_HR':
+#             return JsonResponse({'error': 'You do not have access to get leave balance'}, status=403)
+
+#         # Accumulate leave balance data for all employees
+#         employee_leave_list = []
+#         employees = Employee.objects.all()  # Adjust this query if HR should only access certain employees
+
+#         for employee in employees:
+#             # Since the 'id' field in Employee is a OneToOneField with User, use it to extract user info
+#             employee_data = {
+#                 'employee_id': employee.id.pk,  # primary key of the related User
+#                 'employee_username': employee.id.username,
+#                 'employee_fullname': employee.id.get_full_name(),  # if defined; otherwise, adjust as needed
+#             }
+
+#             # Fetch related leave data based on employee instance
+#             leave_balance = LeaveBalance.objects.filter(empid=employee).first()
+#             leave_per_year = LeavePerYear.objects.filter(empid=employee).first()
+
+#             if not leave_balance or not leave_per_year:
+#                 missing_fields = []
+#                 if not leave_balance:
+#                     missing_fields.append('LeaveBalance')
+#                 if not leave_per_year:
+#                     missing_fields.append('LeavePerYear')
+#                 employee_data['error'] = f"Missing record(s): {', '.join(missing_fields)}."
+#             else:
+#                 employee_data.update({
+#                     'casual_leave_allotted': leave_per_year.casual_leave_allotted,
+#                     'casual_leave_taken': leave_balance.casual_leave_taken,
+#                     'vacation_leave_allotted': leave_per_year.vacation_leave_allotted,
+#                     'vacation_leave_taken': leave_balance.vacation_leave_taken,
+#                     'earned_leave_allotted': leave_per_year.earned_leave_allotted,
+#                     'earned_leave_taken': leave_balance.earned_leave_taken,
+#                     'commuted_leave_allotted': leave_per_year.commuted_leave_allotted,
+#                     'commuted_leave_taken': leave_balance.commuted_leave_taken,
+#                     'special_casual_leave_allotted': leave_per_year.special_casual_leave_allotted,
+#                     'special_casual_leave_taken': leave_balance.special_casual_leave_taken,
+#                     'restricted_holiday_allotted': leave_per_year.restricted_holiday_allotted,
+#                     'restricted_holiday_taken': leave_balance.restricted_holiday_taken,
+#                 })
+
+#             employee_leave_list.append(employee_data)
+
+#         return JsonResponse({'leave_balances': employee_leave_list}, status=200)
+    
+#     except Exception as e:
+#         logger.exception("Unexpected error in admin_get_all_leave_balances view")
+#         return JsonResponse({'error': f'An unexpected error occurred: {str(e)}'}, status=500)
+
+
+
+
+
+
+
+
 
 
 
@@ -1308,11 +1396,19 @@ def admin_get_all_leave_balances(request):
         employees = Employee.objects.all()  # Adjust this query if HR should only access certain employees
 
         for employee in employees:
-            # Since the 'id' field in Employee is a OneToOneField with User, use it to extract user info
+            # Employee.id is a OneToOneField linking to the related User instance
+            user_inst = employee.id
+
+            # Fetch related ExtraInfo for department details (like in get_hr_employees)
+            emp_extra_info = ExtraInfo.objects.filter(user=user_inst).first()
+            department = emp_extra_info.department.name if emp_extra_info and emp_extra_info.department else None
+
+            # Prepare base employee data including department
             employee_data = {
-                'employee_id': employee.id.pk,  # primary key of the related User
-                'employee_username': employee.id.username,
-                'employee_fullname': employee.id.get_full_name(),  # if defined; otherwise, adjust as needed
+                'employee_id': user_inst.id,  # primary key of the User model
+                'employee_username': user_inst.username,
+                # 'employee_fullname': user_inst.get_full_name(),  # if defined; otherwise, adjust as needed
+                'department': department,
             }
 
             # Fetch related leave data based on employee instance
@@ -1323,7 +1419,7 @@ def admin_get_all_leave_balances(request):
                 missing_fields = []
                 if not leave_balance:
                     missing_fields.append('LeaveBalance')
-                if not leave_per_year:
+                if not leave_per_year: 
                     missing_fields.append('LeavePerYear')
                 employee_data['error'] = f"Missing record(s): {', '.join(missing_fields)}."
             else:
@@ -1345,7 +1441,7 @@ def admin_get_all_leave_balances(request):
             employee_leave_list.append(employee_data)
 
         return JsonResponse({'leave_balances': employee_leave_list}, status=200)
-    
+
     except Exception as e:
         logger.exception("Unexpected error in admin_get_all_leave_balances view")
         return JsonResponse({'error': f'An unexpected error occurred: {str(e)}'}, status=500)
