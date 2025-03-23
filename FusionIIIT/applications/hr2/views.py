@@ -295,6 +295,61 @@ def get_form_initials(request):
 
 
 
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_employee_initials(request,empid):
+    """
+    API endpoint to get the details for an employee.
+    If a query parameter "id" is provided, it fetches data for that employee.
+    Otherwise, it returns the details for the logged-in user.
+    """
+    # Check if an employee id is provided in the query parameters
+    employee_id = empid
+    print(employee_id)
+    try:
+        if employee_id:
+            # Fetch the employee based on the provided id
+            employee = Employee.objects.get(id=employee_id)
+        else:
+            # Fall back to the logged-in user
+            employee = Employee.objects.get(id=request.user.id)
+    except Employee.DoesNotExist:
+        return JsonResponse({'error': 'Employee not found'}, status=404)
+    print(0)
+    try:
+        # Fetch extra info associated with the employee (adjust if Employee and User differ)
+        extra_info = ExtraInfo.objects.filter(user=employee.id).first()
+        if not extra_info:
+            return JsonResponse({'error': 'ExtraInfo not found'}, status=404)
+        print(1)
+        # get user of employee
+        user = User.objects.filter(id=employee_id).first()
+        print(user)
+        emp_confidential = EmpConfidentialDetails.objects.filter(empid=employee).first()
+        if not emp_confidential:
+            return JsonResponse({'error': 'EmpConfidentialDetails not found'}, status=404)
+        print(2)
+        department_name = extra_info.department.name if extra_info.department else None
+        print(3)
+        print(user)
+        print(emp_confidential.personal_file_number)
+        print(department_name)
+        return JsonResponse({
+            'name': user.first_name + " " + user.last_name,
+            
+            'pfno': emp_confidential.personal_file_number,
+            'department': department_name,
+        }, status=200)
+    except Exception as e:
+        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+
+
+
+
+
+
+
 
 
 @api_view(['POST'])
@@ -1407,7 +1462,7 @@ def admin_get_all_leave_balances(request):
             employee_data = {
                 'employee_id': user_inst.id,  # primary key of the User model
                 'employee_username': user_inst.username,
-                # 'employee_fullname': user_inst.get_full_name(),  # if defined; otherwise, adjust as needed
+                'employee_fullname': user_inst.get_full_name(),  # if defined; otherwise, adjust as needed
                 'department': department,
             }
 
