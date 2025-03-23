@@ -1407,7 +1407,7 @@ def admin_get_all_leave_balances(request):
             employee_data = {
                 'employee_id': user_inst.id,  # primary key of the User model
                 'employee_username': user_inst.username,
-                # 'employee_fullname': user_inst.get_full_name(),  # if defined; otherwise, adjust as needed
+                'employee_fullname': user_inst.get_full_name(),  # if defined; otherwise, adjust as needed
                 'department': department,
             }
 
@@ -1582,13 +1582,65 @@ def admin_update_leave_balance(request, empid):
 
 
 
+# create an api to get leave_requests of employee with empid with date filter if none then 1 year back
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_get_leave_requests(request, empid):
+    """
+    API endpoint to get all leave requests for a specified employee.
+    """
+    user = request.user
 
+    if not user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
 
+    try:
+        # Get the user's ExtraInfo record to verify role
+        extra_info_qs = ExtraInfo.objects.filter(user=user)
+        if not extra_info_qs.exists():
+            return JsonResponse({'error': 'ExtraInfo not found'}, status=404)
+        extra_info = extra_info_qs.first()
 
+        # Permission check based on last selected role
+        if extra_info.last_selected_role != 'SectionHead_HR':
+            return JsonResponse({'error': 'You do not have access to get leave requests'}, status=403)
 
+        # Fetch the employee using the provided empid
+        try:
+            emp_user = User.objects.get(id=empid)
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
 
+        try:
+            employee = Employee.objects.get(id=emp_user)
+        except Employee.DoesNotExist:
+            return JsonResponse({'error': 'Employee not found'}, status=404)
 
+        # Fetch leave requests for the employee
+        query_date = request.GET.get('date')
+        if not query_date:
+            query_date = datetime.now().date() - timedelta(days=365)
+        else:
+            query_date = datetime.strptime(query_date, '%Y-%m-%d').date()
 
+        leave_requests = LeaveForm.objects.filter(employee=employee, submissionDate__gte=query_date)
+
+        # Prepare the response data
+        leave_requests_data = []
+        for leave_request in leave_requests:
+            leave_requests_data.append({
+                'id': leave_request.id,
+                'submissionDate': leave_request.submissionDate,
+                'status': leave_request.status,
+                'leaveStartDate': leave_request.leaveStartDate,
+                'leaveEndDate': leave_request.leaveEndDate,
+            })
+
+        return JsonResponse({'leave_requests': leave_requests_data}, status=200)
+
+    except Exception as e:
+        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
 
 
 
