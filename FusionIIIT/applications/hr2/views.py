@@ -1,4 +1,5 @@
 import json
+import logging
 from django.shortcuts import render, get_object_or_404
 from .models import *
 from applications.globals.models import ExtraInfo
@@ -23,7 +24,8 @@ from .models import LeaveBalance, LeavePerYear, EmpConfidentialDetails , Employe
 from applications.globals.models import ExtraInfo
 from applications.filetracking.sdk.methods import *
 
-
+# Configure a logger for your module
+logger = logging.getLogger(__name__)
 
 
 
@@ -199,6 +201,7 @@ def search_employees(request):
         - A JSON response containing the list of employees matching the search query.
     """
     user = request.user
+   
 
     # Check if the user has HR access
     if not check_hr_access(request):
@@ -212,6 +215,7 @@ def search_employees(request):
 
         users = User.objects.filter(username__icontains=search_text)
         user_list = []
+    
 
         for user in users:
         
@@ -1268,8 +1272,345 @@ def admin_get_leave_balance(request, empid):
             'restricted_holiday_allotted': leave_per_year.restricted_holiday_allotted,
             'restricted_holiday_taken': leave_balance.restricted_holiday_taken,
         }
-        print(6)
         return JsonResponse({'leave_balance': leave_balance_data}, status=200)
     except Exception as e:
         # Log the error message (consider using logging here for production)
         return JsonResponse({'error': f'An unexpected error occurred: {str(e)}'}, status=500)
+
+
+
+
+
+
+
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_get_all_leave_balances(request):
+    try:
+        user = request.user
+
+        if not user.is_authenticated:
+            return JsonResponse({'error': 'Authentication required'}, status=401)
+
+        # Get the user's ExtraInfo record
+        extra_info = ExtraInfo.objects.filter(user=user).first()
+        if not extra_info:
+            return JsonResponse({'error': 'ExtraInfo not found'}, status=404)
+
+        # Validate the HR role
+        if extra_info.last_selected_role != 'SectionHead_HR':
+            return JsonResponse({'error': 'You do not have access to get leave balance'}, status=403)
+
+        # Accumulate leave balance data for all employees
+        employee_leave_list = []
+        employees = Employee.objects.all()  # Adjust this query if HR should only access certain employees
+
+        for employee in employees:
+            # Since the 'id' field in Employee is a OneToOneField with User, use it to extract user info
+            employee_data = {
+                'employee_id': employee.id.pk,  # primary key of the related User
+                'employee_username': employee.id.username,
+                'employee_fullname': employee.id.get_full_name(),  # if defined; otherwise, adjust as needed
+            }
+
+            # Fetch related leave data based on employee instance
+            leave_balance = LeaveBalance.objects.filter(empid=employee).first()
+            leave_per_year = LeavePerYear.objects.filter(empid=employee).first()
+
+            if not leave_balance or not leave_per_year:
+                missing_fields = []
+                if not leave_balance:
+                    missing_fields.append('LeaveBalance')
+                if not leave_per_year:
+                    missing_fields.append('LeavePerYear')
+                employee_data['error'] = f"Missing record(s): {', '.join(missing_fields)}."
+            else:
+                employee_data.update({
+                    'casual_leave_allotted': leave_per_year.casual_leave_allotted,
+                    'casual_leave_taken': leave_balance.casual_leave_taken,
+                    'vacation_leave_allotted': leave_per_year.vacation_leave_allotted,
+                    'vacation_leave_taken': leave_balance.vacation_leave_taken,
+                    'earned_leave_allotted': leave_per_year.earned_leave_allotted,
+                    'earned_leave_taken': leave_balance.earned_leave_taken,
+                    'commuted_leave_allotted': leave_per_year.commuted_leave_allotted,
+                    'commuted_leave_taken': leave_balance.commuted_leave_taken,
+                    'special_casual_leave_allotted': leave_per_year.special_casual_leave_allotted,
+                    'special_casual_leave_taken': leave_balance.special_casual_leave_taken,
+                    'restricted_holiday_allotted': leave_per_year.restricted_holiday_allotted,
+                    'restricted_holiday_taken': leave_balance.restricted_holiday_taken,
+                })
+
+            employee_leave_list.append(employee_data)
+
+        return JsonResponse({'leave_balances': employee_leave_list}, status=200)
+    
+    except Exception as e:
+        logger.exception("Unexpected error in admin_get_all_leave_balances view")
+        return JsonResponse({'error': f'An unexpected error occurred: {str(e)}'}, status=500)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@api_view(['PUT'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def admin_update_leave_balance(request, empid):
+    """
+    Update leave balance and leave per year for a specified employee.
+    The request JSON may include any of the following numeric fields:
+    
+    For LeaveBalance:
+      - casual_leave_taken
+      - vacation_leave_taken
+      - earned_leave_taken
+      - commuted_leave_taken
+      - special_casual_leave_taken
+      - restricted_holiday_taken
+      
+    For LeavePerYear:
+      - casual_leave_allotted
+      - vacation_leave_allotted
+      - earned_leave_allotted
+      - commuted_leave_allotted
+      - special_casual_leave_allotted
+      - restricted_holiday_allotted
+      
+    Only users with the "SectionHead_HR" role can perform this update.
+    """
+    try:
+        user = request.user
+
+        # Validate user authentication (redundant if using IsAuthenticated but explicit check adds clarity)
+        if not user.is_authenticated:
+            return JsonResponse({'error': 'Authentication required'}, status=401)
+
+        # Get the user's ExtraInfo record to verify role
+        extra_info_qs = ExtraInfo.objects.filter(user=user)
+        if not extra_info_qs.exists():
+            return JsonResponse({'error': 'ExtraInfo not found'}, status=404)
+        extra_info = extra_info_qs.first()
+
+        # Permission check based on last selected role
+        if extra_info.last_selected_role != 'SectionHead_HR':
+            return JsonResponse({'error': 'You do not have access to update leave balances'}, status=403)
+
+        # Fetch the employee using the provided empid
+        try:
+            emp_user = User.objects.get(id=empid)
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+
+        try:
+            employee = Employee.objects.get(id=emp_user)
+        except Employee.DoesNotExist:
+            return JsonResponse({'error': 'Employee not found'}, status=404)
+
+        # Retrieve existing records for leave balance and leave per year for the employee
+        try:
+            leave_balance = LeaveBalance.objects.get(empid=employee)
+        except LeaveBalance.DoesNotExist:
+            return JsonResponse({'error': 'Leave balance not found'}, status=404)
+
+        try:
+            leave_per_year = LeavePerYear.objects.get(empid=employee)
+        except LeavePerYear.DoesNotExist:
+            return JsonResponse({'error': 'Leave per year record not found'}, status=404)
+
+        # Define the fields for each model that can be updated.
+        leave_balance_fields = [
+            'casual_leave_taken',
+            'vacation_leave_taken',
+            'earned_leave_taken',
+            'commuted_leave_taken',
+            'special_casual_leave_taken',
+            'restricted_holiday_taken'
+        ]
+
+        leave_per_year_fields = [
+            'casual_leave_allotted',
+            'vacation_leave_allotted',
+            'earned_leave_allotted',
+            'commuted_leave_allotted',
+            'special_casual_leave_allotted',
+            'restricted_holiday_allotted'
+        ]
+
+        input_data = request.data  # expect JSON payload
+
+        # Update LeaveBalance fields if provided in the payload.
+        for field in leave_balance_fields:
+            if field in input_data:
+                try:
+                    # It's a good idea to cast to float (or int) based on your model definition.
+                    setattr(leave_balance, field, float(input_data[field]))
+                except (ValueError, TypeError):
+                    return JsonResponse({'error': f'Invalid value for {field}'}, status=400)
+
+        # Update LeavePerYear fields if provided.
+        for field in leave_per_year_fields:
+            if field in input_data:
+                try:
+                    setattr(leave_per_year, field, float(input_data[field]))
+                except (ValueError, TypeError):
+                    return JsonResponse({'error': f'Invalid value for {field}'}, status=400)
+
+        # Save changes to both models.
+        leave_balance.save()
+        leave_per_year.save()
+
+        return JsonResponse({'message': 'Leave balance and leave per year updated successfully!'}, status=200)
+
+    except Exception as e:
+        # Consider logging the error in a production environment.
+        return JsonResponse({'error': f'An unexpected error occurred: {str(e)}'}, status=500)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# @api_view(['GET'])
+# @authentication_classes([TokenAuthentication])
+# @permission_classes([IsAuthenticated])
+# def get_hr_employees(request):
+#     """
+#     API endpoint to retrieve all HR-access employees (faculty + staff).
+
+#     For each employee (from the Employee model):
+#       - Fetch the related user (a OneToOne relation via the `id` field).
+#       - Using ExtraInfo, get the department (if available), else keep it null.
+#       - Using HoldsDesignation, return one entry per designation.
+#         If no designation exists for the employee, a single entry with designation as null is returned.
+
+#     Returns:
+#         A JSON response (list) of entries with the following keys:
+#         - id
+#         - name (concatenated first and last name)
+#         - username
+#         - designation
+#         - department
+#     """
+#     # Check if the user has HR access
+#     if not check_hr_access(request):
+#         return JsonResponse({'error': 'HR access required'}, status=403)
+
+#     try:
+#         # Get all employees (this table already contains only HR-access employees)
+#         employees = Employee.objects.all()
+#         results = []
+
+#         for emp in employees:
+#             # Employee.id is a OneToOneField to the User model.
+#             user_inst = emp.id
+
+#             # Fetch extra info similar to get_form_initials.
+#             # If no ExtraInfo exists (or no department is set), department is kept as None.
+#             extra_info = ExtraInfo.objects.filter(user=user_inst).first()
+#             department = extra_info.department.name if extra_info and extra_info.department else None
+
+#             # Fetch designations from HoldsDesignation model
+#             designations_qs = HoldsDesignation.objects.filter(user=user_inst)
+#             if designations_qs.exists():
+#                 # Return one record per designation.
+#                 for hd in designations_qs:
+#                     results.append({
+#                         "id": user_inst.id,
+#                         "name": f"{user_inst.first_name} {user_inst.last_name}",
+#                         "username": user_inst.username,
+#                         "designation": hd.designation.name,  # Assuming the designation has a 'name' field.
+#                         "department": department,
+#                     })
+#             else:
+#                 # If no designation exists, include the employee with designation set to None.
+#                 results.append({
+#                     "id": user_inst.id,
+#                     "name": f"{user_inst.first_name} {user_inst.last_name}",
+#                     "username": user_inst.username,
+#                     "designation": None,
+#                     "department": department,
+#                 })
+
+#         return JsonResponse(results, safe=False, status=200)
+
+#     except Exception as e:
+#         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+
+
+
+
+
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_hr_employees(request):
+    """
+    API endpoint to retrieve all HR-access employees (faculty + staff)
+    with a single entry per employee. For each employee (from the Employee model):
+      - Fetch the related user (a OneToOne relation via the `id` field).
+      - Using ExtraInfo, get the department (if available), else keep it null.
+    
+    Returns:
+        A JSON response (list) of entries with the following keys:
+        - id
+        - name (concatenated first and last name)
+        - username
+        - department
+    """
+
+    # Check if the user has HR access.
+    if not check_hr_access(request):
+        return JsonResponse({'error': 'HR access required'}, status=403)
+
+    try:
+        # Get all employees (the Employee model already includes only those with HR access).
+        employees = Employee.objects.all()
+        results = []
+
+        for emp in employees:
+            # Employee.id is a OneToOneField to the User model.
+            user_inst = emp.id
+
+            # Fetch extra info (for department information) similar to get_form_initials.
+            extra_info = ExtraInfo.objects.filter(user=user_inst).first()
+            department = extra_info.department.name if extra_info and extra_info.department else None
+
+            # Append a single entry per employee.
+            results.append({
+                "id": user_inst.id,
+                "name": f"{user_inst.first_name} {user_inst.last_name}",
+                "username": user_inst.username,
+                "department": department,
+            })
+
+        return JsonResponse(results, safe=False, status=200)
+
+    except Exception as e:
+        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)

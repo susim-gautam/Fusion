@@ -22,6 +22,9 @@ urlpatterns = [
     url(r'^api/handle_leave_file/(?P<form_id>\d+)/$', views.handle_leave_file, name='handle_leave_file'),
 
     url(r'^api/admin_get_leave_balance/(?P<empid>\w+)/$', views.admin_get_leave_balance, name='admin_get_leave_balance'),
+    url(r'^api/admin_get_all_leave_balances/$', views.admin_get_all_leave_balances, name='admin_get_all_leave_balances'),
+    url(r'^api/admin_update_leave_balance/(?P<empid>\w+)/$', views.admin_update_leave_balance, name='admin_update_leave_balance'),
+    url(r'^api/hr_employees', views.get_hr_employees, name='get_hr_employees'),
 
     url(r'api/get_track_file/(?P<id>\d+)/$', views.track_file_react, name='track_file_react'),
 
