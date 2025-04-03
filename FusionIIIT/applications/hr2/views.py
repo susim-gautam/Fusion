@@ -140,46 +140,58 @@ def get_leave_balance(request):
         extra_info = ExtraInfo.objects.get(user=user)
 
         # Fetch the leave balance for the user
+        print("1")
         leave_balance = LeaveBalance.objects.filter(empid__id=user.id).first()
         leave_per_year = LeavePerYear.objects.filter(empid__id=user.id).first()
-
+        print("2")
         if not leave_balance or not leave_per_year:
             return JsonResponse({'error': 'Leave balance data not found'}, status=404)
+        print("3")
 
         # Prepare the response data
         leave_data = {
             'casual_leave': {
-                'allotted': leave_per_year.casual_leave_allotted,
+                'allotted': leave_per_year.casual_leave,
                 'taken': leave_balance.casual_leave_taken,
-                'balance': leave_per_year.casual_leave_allotted - leave_balance.casual_leave_taken,
+                'balance': leave_per_year.casual_leave - leave_balance.casual_leave_taken,
             },
             'special_casual_leave': {
-                'allotted': leave_per_year.special_casual_leave_allotted,
+                'allotted': leave_per_year.special_casual_leave,
                 'taken': leave_balance.special_casual_leave_taken,
-                'balance': leave_per_year.special_casual_leave_allotted - leave_balance.special_casual_leave_taken,
+                'balance': leave_per_year.special_casual_leave - leave_balance.special_casual_leave_taken,
             },
             'earned_leave': {
-                'allotted': leave_per_year.earned_leave_allotted,
+                'allotted': leave_per_year.earned_leave,
                 'taken': leave_balance.earned_leave_taken,
-                'balance': leave_per_year.earned_leave_allotted - leave_balance.earned_leave_taken,
+                'balance': leave_per_year.earned_leave - leave_balance.earned_leave_taken,
             },
-            'commuted_leave': {
-                'allotted': leave_per_year.commuted_leave_allotted,
-                'taken': leave_balance.commuted_leave_taken,
-                'balance': leave_per_year.commuted_leave_allotted - leave_balance.commuted_leave_taken,
+            'half_pay_leave': {
+                'allotted': leave_per_year.half_pay_leave,
+                'taken': leave_balance.half_pay_leave_taken,
+                'balance': leave_per_year.half_pay_leave - leave_balance.half_pay_leave_taken,
             },
-            'restricted_holiday': {
-                'allotted': leave_per_year.restricted_holiday_allotted,
-                'taken': leave_balance.restricted_holiday_taken,
-                'balance': leave_per_year.restricted_holiday_allotted - leave_balance.restricted_holiday_taken,
+            'maternity_leave': {
+                'allotted': leave_per_year.maternity_leave,
+                'taken': leave_balance.maternity_leave_taken,
+                'balance': leave_per_year.maternity_leave - leave_balance.maternity_leave_taken,
             },
-            'vacation_leave': {
-                'allotted': leave_per_year.vacation_leave_allotted,
-                'taken': leave_balance.vacation_leave_taken,
-                'balance': leave_per_year.vacation_leave_allotted - leave_balance.vacation_leave_taken,
+            'child_care_leave': {
+                'allotted': leave_per_year.child_care_leave,
+                'taken': leave_balance.child_care_leave_taken,
+                'balance': leave_per_year.child_care_leave - leave_balance.child_care_leave_taken,
             },
+            'paternity_leave': {
+                'allotted': leave_per_year.paternity_leave,
+                'taken': leave_balance.paternity_leave_taken,
+                'balance': leave_per_year.paternity_leave - leave_balance.paternity_leave_taken,
+            },
+            'leave_encashment': {
+                'allotted': leave_per_year.leave_encashment,
+                'taken': leave_balance.leave_encashment_taken,
+                'balance': leave_per_year.leave_encashment - leave_balance.leave_encashment_taken,
+            }
         }
-
+        print("4")
         # Return the leave balance data
         return JsonResponse({'leave_balance': leave_data}, status=200)
 
@@ -313,157 +325,229 @@ def submit_leave_form(request):
         form_data = request.POST
         files = request.FILES
 
-        # Extract form data
-        name = form_data.get('name')
-        designation = form_data.get('designation')
-        pfno = form_data.get('pfno')
-        submissionDate = form_data.get('date')
-        department = form_data.get('department')
-        leave_start_date = form_data.get('leaveStartDate')
-        leave_end_date = form_data.get('leaveEndDate')
-        purpose = form_data.get('purpose')
-        casual_leave = form_data.get('casualLeave', 0)
-        vacation_leave = form_data.get('vacationLeave', 0)
-        earned_leave = form_data.get('earnedLeave', 0)
-        commuted_leave = form_data.get('commutedLeave', 0)
-        special_casual_leave = form_data.get('specialCasualLeave', 0)
-        restricted_holiday = form_data.get('restrictedHoliday', 0)
-        remarks = form_data.get('remarks')
-        station_leave = form_data.get('stationLeave', 'false').lower() == 'true'
-        station_leave_start_date = form_data.get('stationLeaveStartDate')
-        station_leave_end_date = form_data.get('stationLeaveEndDate')
-        station_leave_address = form_data.get('stationLeaveAddress')
-        academic_responsibility_id = form_data.get('academicResponsibility')
-        academic_responsibility_designation = form_data.get('academicResponsibility_designation')
-        administrative_responsibility_id = form_data.get('administrativeResponsibility')
-        administrative_responsibility_designation = form_data.get('administrativeResponsibility_designation')
-        first_recieved_by_id = form_data.get('forwardTo')
-        first_recieved_designation = form_data.get('forwardTo_designation')
-        attached_pdf = files.get('attached_pdf')
+        # Validate required fields first
+        required_fields = [
+            'name', 'designation', 'pfno', 'department', 
+            'leaveStartDate', 'leaveEndDate', 'purpose', 'forwardTo'
+        ]
+        missing_fields = [field for field in required_fields if not form_data.get(field)]
+        if missing_fields:
+            return JsonResponse(
+                {'error': f'Missing required fields: {", ".join(missing_fields)}'},
+                status=400
+            )
 
-        # Validate required fields
-        if not all([name, designation, pfno, department, leave_start_date, leave_end_date, purpose, remarks]):
-            return JsonResponse({'error': 'All required fields must be provided'}, status=400)
+        # Extract all form data
+        data = {
+            'name': form_data.get('name'),
+            'designation': form_data.get('designation'),
+            'pfno': form_data.get('pfno'),
+            'submissionDate': form_data.get('date'),
+            'department': form_data.get('department'),
+            'leave_start_date': form_data.get('leaveStartDate'),
+            'leave_end_date': form_data.get('leaveEndDate'),
+            'purpose': form_data.get('purpose'),
+            'casual_leave': int(form_data.get('casualLeave', 0)),
+            'vacation_leave': int(form_data.get('vacationLeave', 0)),
+            'earned_leave': int(form_data.get('earnedLeave', 0)),
+            'commuted_leave': int(form_data.get('commutedLeave', 0)),
+            'special_casual_leave': int(form_data.get('specialCasualLeave', 0)),
+            'restricted_holiday': int(form_data.get('restrictedHoliday', 0)),
+            'half_pay_leave': int(form_data.get('halfPayLeave', 0)),
+            'maternity_leave': int(form_data.get('maternityLeave', 0)),
+            'child_care_leave': int(form_data.get('childCareLeave', 0)),
+            'paternity_leave': int(form_data.get('paternityLeave', 0)),
+            'remarks': form_data.get('remarks', 'N/A'),
+            'station_leave': form_data.get('stationLeave', 'false').lower() == 'true',
+            'station_leave_start_date': form_data.get('stationLeaveStartDate'),
+            'station_leave_end_date': form_data.get('stationLeaveEndDate'),
+            'station_leave_address': form_data.get('stationLeaveAddress'),
+            'academic_responsibility_id': form_data.get('academicResponsibility'),
+            'academic_responsibility_designation': form_data.get('academicResponsibility_designation'),
+            'administrative_responsibility_id': form_data.get('administrativeResponsibility'),
+            'administrative_responsibility_designation': form_data.get('administrativeResponsibility_designation'),
+            'first_received_by_id': form_data.get('forwardTo'),
+            'first_received_designation': form_data.get('forwardTo_designation'),
+            'attached_pdf': files.get('attached_pdf')
+        }
 
-        # Validate leave dates
+        # Validate dates
         try:
-            leave_start_date = datetime.strptime(leave_start_date, "%Y-%m-%d").date()
-            leave_end_date = datetime.strptime(leave_end_date, '%Y-%m-%d').date()
-            if leave_end_date < leave_start_date:
-                return JsonResponse({'error': 'Leave end date cannot be before start date'}, status=400)
+            data['leave_start_date'] = datetime.strptime(data['leave_start_date'], "%Y-%m-%d").date()
+            data['leave_end_date'] = datetime.strptime(data['leave_end_date'], '%Y-%m-%d').date()
+            if data['leave_end_date'] < data['leave_start_date']:
+                return JsonResponse(
+                    {'error': 'Leave end date cannot be before start date'},
+                    status=400
+                )
         except ValueError:
-            return JsonResponse({'error': 'Invalid leave date format. Use YYYY-MM-DD'}, status=400)
+            return JsonResponse(
+                {'error': 'Invalid leave date format. Use YYYY-MM-DD'},
+                status=400
+            )
 
-        # Validate station leave fields if station leave is checked
-        if station_leave:
-            if not all([station_leave_start_date, station_leave_end_date, station_leave_address]):
-                return JsonResponse({'error': 'Station leave details are required when station leave is checked'}, status=400)
+        # Validate station leave
+        if data['station_leave']:
+            if not all([data['station_leave_start_date'], data['station_leave_end_date'], data['station_leave_address']]):
+                return JsonResponse(
+                    {'error': 'Station leave details are required when station leave is checked'},
+                    status=400
+                )
             try:
-                station_leave_start_date = datetime.strptime(station_leave_start_date, '%Y-%m-%d').date()
-                station_leave_end_date = datetime.strptime(station_leave_end_date, '%Y-%m-%d').date()
-                if station_leave_end_date < station_leave_start_date:
-                    return JsonResponse({'error': 'Station leave end date cannot be before start date'}, status=400)
+                data['station_leave_start_date'] = datetime.strptime(data['station_leave_start_date'], '%Y-%m-%d').date()
+                data['station_leave_end_date'] = datetime.strptime(data['station_leave_end_date'], '%Y-%m-%d').date()
+                if data['station_leave_end_date'] < data['station_leave_start_date']:
+                    return JsonResponse(
+                        {'error': 'Station leave end date cannot be before start date'},
+                        status=400
+                    )
             except ValueError:
-                return JsonResponse({'error': 'Invalid station leave date format. Use YYYY-MM-DD'}, status=400)
+                return JsonResponse(
+                    {'error': 'Invalid station leave date format. Use YYYY-MM-DD'},
+                    status=400
+                )
         else:
-            # Set station leave fields to None if station leave is not checked
-            station_leave_start_date = None
-            station_leave_end_date = None
-            station_leave_address = None
+            data['station_leave_start_date'] = None
+            data['station_leave_end_date'] = None
+            data['station_leave_address'] = None
 
-        # Get the employee associated with the user
+        # Get employee
         try:
             employee = Employee.objects.get(id=user.id)
         except Employee.DoesNotExist:
             return JsonResponse({'error': 'Employee not found'}, status=404)
 
-        # Get the academic responsibility user
-        try:
-            academic_responsibility_user = Employee.objects.get(id=academic_responsibility_id)
-        except Employee.DoesNotExist:
-            return JsonResponse({'error': 'Academic Responsibility user not found'}, status=404)
-        
-        # Get the academic responsibility designation
-        try:
-            academic_responsibility_designation = Designation.objects.get(name=academic_responsibility_designation)
-        except Designation.DoesNotExist:
-            return JsonResponse({'error': 'Academic Responsibility designation not found'}, status=404)
-        
+        # Handle academic responsibility (optional)
+        academic_responsibility = None
+        if data['academic_responsibility_id']:
+            try:
+                academic_responsibility = {
+                    'user': Employee.objects.get(id=data['academic_responsibility_id']),
+                    'designation': Designation.objects.get(name=data['academic_responsibility_designation'])
+                }
+            except (Employee.DoesNotExist, Designation.DoesNotExist):
+                return JsonResponse(
+                    {'error': 'Academic Responsibility user or designation not found'},
+                    status=404
+                )
 
-        # Get the administrative responsibility user
-        try:
-            administrative_responsibility_user = Employee.objects.get(id=administrative_responsibility_id)
-        except Employee.DoesNotExist:
-            return JsonResponse({'error': 'Administrative Responsibility user not found'}, status=404)
-        
-        # Get the administrative responsibility designation
-        try:
-            administrative_responsibility_designation = Designation.objects.get(name=administrative_responsibility_designation)
-        except Designation.DoesNotExist:
-            return JsonResponse({'error': 'Administrative Responsibility designation not found'}, status=404)
+        # Handle administrative responsibility (optional)
+        administrative_responsibility = None
+        if data['administrative_responsibility_id']:
+            try:
+                administrative_responsibility = {
+                    'user': Employee.objects.get(id=data['administrative_responsibility_id']),
+                    'designation': Designation.objects.get(name=data['administrative_responsibility_designation'])
+                }
+            except (Employee.DoesNotExist, Designation.DoesNotExist):
+                return JsonResponse(
+                    {'error': 'Administrative Responsibility user or designation not found'},
+                    status=404
+                )
 
-        # Get the first received by user
+        # Get first received by (required)
         try:
-            first_recieved_by_user = Employee.objects.get(id=first_recieved_by_id)
-        except Employee.DoesNotExist:
-            return JsonResponse({'error': 'First Received By user not found'}, status=404)
+            first_received_by = {
+                'user': Employee.objects.get(id=data['first_received_by_id']),
+                'designation': Designation.objects.get(name=data['first_received_designation'])
+            }
+        except (Employee.DoesNotExist, Designation.DoesNotExist):
+            return JsonResponse(
+                {'error': 'First Received By user or designation not found'},
+                status=404
+            )
 
-        # Get the first received designation
-        try:
-            first_recieved_designation = Designation.objects.get(name=first_recieved_designation)
-        except Designation.DoesNotExist:
-            return JsonResponse({'error': 'First Received By designation not found'}, status=404)
+        # Handle PDF attachment
+        pdf_data = None
+        if data['attached_pdf']:
+            pdf_data = {
+                'binary': data['attached_pdf'].read(),
+                'name': data['attached_pdf'].name
+            }
 
-        # Handle attached PDF file
-        attached_pdf_binary = None
-        attached_pdf_name = None
-        if attached_pdf:
-            attached_pdf_binary = attached_pdf.read()
-            attached_pdf_name=attached_pdf.name
-
-        # Create and save the leave form
+        # Create leave form first (without file_id)
         leave_form = LeaveForm(
             employee=employee,
-            name=name,
-            designation=designation,
-            personalfileNo=pfno,
-            submissionDate=submissionDate,
-            departmentInfo=department,
-            leaveStartDate=leave_start_date,
-            leaveEndDate=leave_end_date,
-            Purpose_of_leave=purpose,
-            Noof_CasualLeave=casual_leave,
-            Noof_vacationLeave=vacation_leave,
-            Noof_earnedLeave=earned_leave,
-            Noof_commutedLeave=commuted_leave,
-            Noof_specialCasualLeave=special_casual_leave,
-            Noof_restrictedHoliday=restricted_holiday,
-            Remarks=remarks,
-            LeavingStation=station_leave,
-            StationLeave_startdate=station_leave_start_date,
-            StationLeave_enddate=station_leave_end_date,
-            Address_During_StationLeave=station_leave_address,
-            AcademicResponsibility_user=academic_responsibility_user,
-            AcademicResponsibility_designation=academic_responsibility_designation,
-            AcademicResponsibility_status='Pending',
-            AdministrativeResponsibility_user=administrative_responsibility_user,
-            AdministrativeResponsibility_designation=administrative_responsibility_designation,
-            AdministrativeResponsibility_status='Pending',
-            first_recieved_by=first_recieved_by_user,
-            first_recieved_designation=first_recieved_designation,
+            name=data['name'],
+            designation=data['designation'],
+            personalfileNo=data['pfno'],
+            submissionDate=data['submissionDate'],
+            departmentInfo=data['department'],
+            leaveStartDate=data['leave_start_date'],
+            leaveEndDate=data['leave_end_date'],
+            Purpose_of_leave=data['purpose'],
+            Noof_CasualLeave=data['casual_leave'],
+            Noof_vacationLeave=data['vacation_leave'],
+            Noof_earnedLeave=data['earned_leave'],
+            Noof_commutedLeave=data['commuted_leave'],
+            Noof_specialCasualLeave=data['special_casual_leave'],
+            Noof_restrictedHoliday=data['restricted_holiday'],
+            Noof_halfPayLeave=data['half_pay_leave'],
+            Noof_maternityLeave=data['maternity_leave'],
+            Noof_childCareLeave=data['child_care_leave'],
+            Noof_paternityLeave=data['paternity_leave'],
+            Remarks=data['remarks'],
+            LeavingStation=data['station_leave'],
+            StationLeave_startdate=data['station_leave_start_date'],
+            StationLeave_enddate=data['station_leave_end_date'],
+            Address_During_StationLeave=data['station_leave_address'],
+            AcademicResponsibility_user=academic_responsibility['user'] if academic_responsibility else None,
+            AcademicResponsibility_designation=academic_responsibility['designation'] if academic_responsibility else None,
+            AcademicResponsibility_status='Pending' if academic_responsibility else 'Accepted',
+            AdministrativeResponsibility_user=administrative_responsibility['user'] if administrative_responsibility else None,
+            AdministrativeResponsibility_designation=administrative_responsibility['designation'] if administrative_responsibility else None,
+            AdministrativeResponsibility_status='Pending' if administrative_responsibility else 'Accepted',
+            first_recieved_by=first_received_by['user'],
+            first_recieved_designation=first_received_by['designation'],
             status='Pending',
-            attached_pdf=attached_pdf_binary,
-            attached_pdf_name=attached_pdf_name,
-
+            attached_pdf=pdf_data['binary'] if pdf_data else None,
+            attached_pdf_name=pdf_data['name'] if pdf_data else None,
+            file_id=None  # Initialize as None, will be updated later
         )
         leave_form.save()
-        return JsonResponse({'message': 'Leave form submitted successfully'}, status=200)
+
+        # Create file tracking if no responsibilities assigned
+        file_id = None
+        if not academic_responsibility and not administrative_responsibility:
+            try:
+                file_id = create_file(
+                    uploader=employee.id,
+                    uploader_designation=data['designation'],
+                    receiver=first_received_by['user'].id.username,
+                    receiver_designation=first_received_by['designation'].name,
+                    src_module="HR",
+                    src_object_id=str(leave_form.id),
+                    file_extra_JSON={"type": "Leave"},
+                    attached_file=None
+                )
+                # Update the leave form with the file_id
+                leave_form.file_id = file_id
+                leave_form.save()
+            except Exception as e:
+                return JsonResponse(
+                    {'error': f'Failed to create file tracking: {str(e)}'},
+                    status=500
+                )
+
+        return JsonResponse(
+            {
+                'message': 'Leave form submitted successfully',
+                'form_id': leave_form.id,
+                'file_id': file_id
+            },
+            status=201
+        )
 
     except ValidationError as e:
-        return JsonResponse({'error': f'Validation error: {str(e)}'}, status=400)
+        return JsonResponse(
+            {'error': f'Validation error: {str(e)}'},
+            status=400
+        )
     except Exception as e:
-        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
-    
+        return JsonResponse(
+            {'error': f'An unexpected error occurred: {str(e)}'},
+            status=500
+        )
 
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])
@@ -526,7 +610,7 @@ def get_leave_form_by_id(request, form_id):
         return JsonResponse({'error': 'Authentication required'}, status=401)
 
     try:
-        #print("0")
+        print("0")
         # Get the employee associated with the user
         employee = Employee.objects.filter(id=user)
         if not employee.exists():
@@ -542,38 +626,51 @@ def get_leave_form_by_id(request, form_id):
             return JsonResponse({'error': 'Leave per year not found'}, status=404)
         
 
-        #print("1")
+        print("1")
         # Get the leave form by ID
         leave_form = LeaveForm.objects.filter(id=form_id)
         if not leave_form.exists():
             return JsonResponse({'error': 'Leave form not found'}, status=404)
         leave_form = leave_form.first()
-        #print("2")
-        # Access the AcademicResponsibility_user (Employee object)
-        academic_responsibility_employee = leave_form.AcademicResponsibility_user
+        print("2")
+        academic_responsibility_employee=None
+        academic_responsibility_user=None
+        academic_responsibility_name=None
+        academic_responsibility_designation=None
+        if(leave_form.AcademicResponsibility_user):
+            # Access the AcademicResponsibility_user (Employee object) only if is not null else set None
+            academic_responsibility_employee = leave_form.AcademicResponsibility_user
 
-        # Access the User object from the Employee object
-        academic_responsibility_user = academic_responsibility_employee.id
+            # Access the User object from the Employee object
+            academic_responsibility_user = academic_responsibility_employee.id
+            
+            # access name of academic_responsibility_user
+            academic_responsibility_name = academic_responsibility_user.first_name + " " + academic_responsibility_user.last_name
+            #print(academic_responsibility_name)
+
+            # Access designations of academic_responsibility_user
+            academic_responsibility_designation = leave_form.AcademicResponsibility_designation.name
         
-        # access name of academic_responsibility_user
-        academic_responsibility_name = academic_responsibility_user.first_name + " " + academic_responsibility_user.last_name
-        #print(academic_responsibility_name)
+        print("hi")
 
-        # Access designations of academic_responsibility_user
-        academic_responsibility_designation = leave_form.AcademicResponsibility_designation.name
+        administrative_responsibility_employee=None
+        administrative_responsibility_user=None
+        administrative_responsibility_name=None
+        administrative_responsibility_designation=None,
+        if(leave_form.AdministrativeResponsibility_user):
+            # Access the AdministrativeResponsibility_user (Employee object)
+            administrative_responsibility_employee = leave_form.AdministrativeResponsibility_user
 
+            # Access the User object from the Employee object
+            administrative_responsibility_user = administrative_responsibility_employee.id
 
-        # Access the AdministrativeResponsibility_user (Employee object)
-        administrative_responsibility_employee = leave_form.AdministrativeResponsibility_user
+            # access name of administrative_responsibility_user
+            administrative_responsibility_name = administrative_responsibility_user.first_name + " " + administrative_responsibility_user.last_name
 
-        # Access the User object from the Employee object
-        administrative_responsibility_user = administrative_responsibility_employee.id
-
-        # access name of administrative_responsibility_user
-        administrative_responsibility_name = administrative_responsibility_user.first_name + " " + administrative_responsibility_user.last_name
-
-        # Access designations of administrative_responsibility_user
-        administrative_responsibility_designation = leave_form.AdministrativeResponsibility_designation.name
+            # Access designations of administrative_responsibility_user
+            administrative_responsibility_designation = leave_form.AdministrativeResponsibility_designation.name
+        
+        print("hi2")
 
         # Access the first_recieved_by (Employee object)
         first_recieved_by_employee = leave_form.first_recieved_by
@@ -588,7 +685,7 @@ def get_leave_form_by_id(request, form_id):
         # Access designations of first_recieved_by_user
         first_recieved_by_designation = leave_form.first_recieved_designation.name
 
-        #print("2.5")
+        print("2.5")
 
 
         # attcahed file name only
@@ -622,17 +719,22 @@ def get_leave_form_by_id(request, form_id):
             'leaveEndDate': leave_form.leaveEndDate,
             'purpose': leave_form.Purpose_of_leave,
             'casualLeave': leave_form.Noof_CasualLeave,
-            'cadualLeaveBalance': leave_per_year.casual_leave_allotted - leave_balance.casual_leave_taken if leave_per_year.casual_leave_allotted and leave_balance.casual_leave_taken else 'N/A',
             'vacationLeave': leave_form.Noof_vacationLeave,
-            'vacationLeaveBalance': leave_per_year.vacation_leave_allotted - leave_balance.vacation_leave_taken if leave_per_year.vacation_leave_allotted and leave_balance.vacation_leave_taken else 'N/A',
             'earnedLeave': leave_form.Noof_earnedLeave,
-            'earnedLeaveBalance': leave_per_year.earned_leave_allotted - leave_balance.earned_leave_taken if leave_per_year.earned_leave_allotted and leave_balance.earned_leave_taken else 'N/A',
             'commutedLeave': leave_form.Noof_commutedLeave,
-            'commutedLeaveBalance': leave_per_year.commuted_leave_allotted - leave_balance.commuted_leave_taken if leave_per_year.commuted_leave_allotted and leave_balance.commuted_leave_taken else 'N/A',
             'specialCasualLeave': leave_form.Noof_specialCasualLeave,
-            'specialCasualLeaveBalance': leave_per_year.special_casual_leave_allotted - leave_balance.special_casual_leave_taken if leave_per_year.special_casual_leave_allotted and leave_balance.special_casual_leave_taken else 'N/A',
             'restrictedHoliday': leave_form.Noof_restrictedHoliday,
-            'restrictedHolidayBalance': leave_per_year.restricted_holiday_allotted - leave_balance.restricted_holiday_taken if leave_per_year.restricted_holiday_allotted and leave_balance.restricted_holiday_taken else 'N/A',
+            'maternityLeave':leave_form.Noof_maternityLeave,
+            'childCareLeave':leave_form.Noof_childCareLeave,
+            'paternityLeave':leave_form.Noof_paternityLeave,
+            'halfPayLeave':leave_form.Noof_halfPayLeave,
+            'casualLeaveBalance':leave_per_year.casual_leave - leave_balance.casual_leave_taken,
+            'special_casual_leaveBalance':leave_per_year.special_casual_leave - leave_balance.special_casual_leave_taken,
+            'earned_leaveBalance':leave_per_year.earned_leave - leave_balance.earned_leave_taken,
+            'half_pay_leaveBalance':leave_per_year.half_pay_leave - leave_balance.half_pay_leave_taken,
+            'maternity_leaveBalance':leave_per_year.maternity_leave - leave_balance.maternity_leave_taken,
+            'child_care_leaveBalance':leave_per_year.child_care_leave - leave_balance.child_care_leave_taken,
+            'paternity_leaveBalance':leave_per_year.paternity_leave - leave_balance.paternity_leave_taken,
             'remarks': leave_form.Remarks,
             'stationLeave': leave_form.LeavingStation,
             'stationLeaveStartDate': leave_form.StationLeave_startdate,
@@ -652,6 +754,7 @@ def get_leave_form_by_id(request, form_id):
             'approvedByDesignation': approved_by_designation,
             'approvedDate': approved_date,
             'file_id': leave_form.file_id,
+            'application_type': leave_form.application_type,
         }
         # #print("3") 
         # #print(leave_form_data)
@@ -963,7 +1066,10 @@ def get_leave_inbox(request):
             reciever_designation = designation
         print("9")
         print(username,designation)
+
         inbox = view_inbox(username=username, designation=reciever_designation, src_module="HR")
+        print("inbox")
+        
         # type== leave and upload_date> query date
         filtered_inbox = [
             i for i in inbox
@@ -971,15 +1077,17 @@ def get_leave_inbox(request):
             datetime.strptime(i['upload_date'], "%Y-%m-%dT%H:%M:%S.%f").date() >= query_date ]
 
         # in fileterd_inbox  get designation name by designatetion id and fetch status of each leave form by src_object_id
+        print("x")
         for i in filtered_inbox:
             if i['designation']:
                 designation = Designation.objects.get(id=i['designation'])
                 i['designation'] = designation.name
+                print(i['designation'])
             src_object_id = i['src_object_id']
             leave_form = LeaveForm.objects.get(id=src_object_id)
             i['status'] = leave_form.status
         
-        #print("10")
+        print("10")
         
 
         return JsonResponse({
@@ -1181,11 +1289,16 @@ def handle_leave_file(request, form_id):
             print("hi  1 ")
             
             leave_balance.casual_leave_taken += leave_instance.Noof_CasualLeave
-            leave_balance.vacation_leave_taken += leave_instance.Noof_vacationLeave
-            leave_balance.earned_leave_taken += leave_instance.Noof_earnedLeave
-            leave_balance.commuted_leave_taken += leave_instance.Noof_commutedLeave
             leave_balance.special_casual_leave_taken += leave_instance.Noof_specialCasualLeave
+            leave_balance.earned_leave_taken += (leave_instance.Noof_earnedLeave+2*leave_instance.Noof_vacationLeave)
+            leave_balance.half_pay_leave_taken += (leave_instance.Noof_halfPayLeave +2*leave_instance.Noof_commutedLeave)
+            leave_balance.maternity_leave_taken += leave_instance.Noof_maternityLeave
+            leave_balance.child_care_leave_taken += leave_instance.Noof_childCareLeave
+            leave_balance.paternity_leave_taken += leave_instance.Noof_paternityLeave
             leave_balance.restricted_holiday_taken += leave_instance.Noof_restrictedHoliday
+            
+
+
 
             
             # return JsonResponse({'message': 'File accepted successfully'}, status=200)
@@ -1259,19 +1372,34 @@ def admin_get_leave_balance(request, empid):
         
         # Prepare leave balance data
         leave_balance_data = {
-            'casual_leave_allotted': leave_per_year.casual_leave_allotted,
+            'casual_leave_allotted': leave_per_year.casual_leave,
             'casual_leave_taken': leave_balance.casual_leave_taken,
-            'vacation_leave_allotted': leave_per_year.vacation_leave_allotted,
-            'vacation_leave_taken': leave_balance.vacation_leave_taken,
-            'earned_leave_allotted': leave_per_year.earned_leave_allotted,
+            
+            'earned_leave_allotted': leave_per_year.earned_leave,
             'earned_leave_taken': leave_balance.earned_leave_taken,
-            'commuted_leave_allotted': leave_per_year.commuted_leave_allotted,
-            'commuted_leave_taken': leave_balance.commuted_leave_taken,
-            'special_casual_leave_allotted': leave_per_year.special_casual_leave_allotted,
+            
+            'special_casual_leave_allotted': leave_per_year.special_casual_leave,
             'special_casual_leave_taken': leave_balance.special_casual_leave_taken,
-            'restricted_holiday_allotted': leave_per_year.restricted_holiday_allotted,
+            'restricted_holiday_allotted': leave_per_year.restricted_holiday,
             'restricted_holiday_taken': leave_balance.restricted_holiday_taken,
+
+            'half_pay_leave_allotted': leave_per_year.half_pay_leave,
+            'half_pay_leave_taken': leave_balance.half_pay_leave_taken,
+
+            'maternity_leave_allotted': leave_per_year.maternity_leave,
+            'maternity_leave_taken': leave_balance.maternity_leave_taken,
+
+            'child_care_leave_allotted': leave_per_year.child_care_leave,
+            'child_care_leave_taken': leave_balance.child_care_leave_taken,
+
+            'paternity_leave_allotted': leave_per_year.paternity_leave,
+            'paternity_leave_taken': leave_balance.paternity_leave_taken,
+
+            'leave_encashment_allotted': leave_per_year.leave_encashment,
+            'leave_encashment_taken': leave_balance.leave_encashment_taken,
+            
         }
+
         return JsonResponse({'leave_balance': leave_balance_data}, status=200)
     except Exception as e:
         # Log the error message (consider using logging here for production)
@@ -1424,18 +1552,34 @@ def admin_get_all_leave_balances(request):
                 employee_data['error'] = f"Missing record(s): {', '.join(missing_fields)}."
             else:
                 employee_data.update({
-                    'casual_leave_allotted': leave_per_year.casual_leave_allotted,
+                    
+                    'casual_leave_allotted': leave_per_year.casual_leave,
                     'casual_leave_taken': leave_balance.casual_leave_taken,
-                    'vacation_leave_allotted': leave_per_year.vacation_leave_allotted,
-                    'vacation_leave_taken': leave_balance.vacation_leave_taken,
-                    'earned_leave_allotted': leave_per_year.earned_leave_allotted,
+                    
+                    'earned_leave_allotted': leave_per_year.earned_leave,
                     'earned_leave_taken': leave_balance.earned_leave_taken,
-                    'commuted_leave_allotted': leave_per_year.commuted_leave_allotted,
-                    'commuted_leave_taken': leave_balance.commuted_leave_taken,
-                    'special_casual_leave_allotted': leave_per_year.special_casual_leave_allotted,
+                    
+                    'special_casual_leave_allotted': leave_per_year.special_casual_leave,
                     'special_casual_leave_taken': leave_balance.special_casual_leave_taken,
-                    'restricted_holiday_allotted': leave_per_year.restricted_holiday_allotted,
+                    'restricted_holiday_allotted': leave_per_year.restricted_holiday,
                     'restricted_holiday_taken': leave_balance.restricted_holiday_taken,
+
+                    'half_pay_leave_allotted': leave_per_year.half_pay_leave,
+                    'half_pay_leave_taken': leave_balance.half_pay_leave_taken,
+
+                    'maternity_leave_allotted': leave_per_year.maternity_leave,
+                    'maternity_leave_taken': leave_balance.maternity_leave_taken,
+
+                    'child_care_leave_allotted': leave_per_year.child_care_leave,
+                    'child_care_leave_taken': leave_balance.child_care_leave_taken,
+
+                    'paternity_leave_allotted': leave_per_year.paternity_leave,
+                    'paternity_leave_taken': leave_balance.paternity_leave_taken,
+
+                    'leave_encashment_allotted': leave_per_year.leave_encashment,
+                    'leave_encashment_taken': leave_balance.leave_encashment_taken,
+                    
+                
                 })
 
             employee_leave_list.append(employee_data)
